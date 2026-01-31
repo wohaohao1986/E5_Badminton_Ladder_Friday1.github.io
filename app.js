@@ -9,6 +9,12 @@ let data = {
   roundHistory: []
 };
 
+const CATEGORIES = {
+  male: '男双',
+  female: '女双',
+  fun: '娱乐'
+};
+
 function init() {
   const stored = localStorage.getItem('badminton_ladder_v2');
   if (stored) {
@@ -21,6 +27,7 @@ function init() {
   data.players.forEach(p => {
     if (p.active === undefined) p.active = true;
     if (p.ranking === undefined) p.ranking = 999;
+    if (!p.category) p.category = 'fun';
   });
   
   sortPlayersByRanking();
@@ -32,7 +39,13 @@ function saveData() {
 }
 
 function sortPlayersByRanking() {
-  data.players.sort((a, b) => a.ranking - b.ranking);
+  Object.keys(CATEGORIES).forEach(cat => {
+    const catPlayers = data.players.filter(p => p.category === cat);
+    catPlayers.sort((a, b) => a.ranking - b.ranking);
+    catPlayers.forEach((p, index) => {
+      p.ranking = index + 1;
+    });
+  });
 }
 
 function showPage(page) {
@@ -111,42 +124,58 @@ function renderHome() {
   document.getElementById('home-round').textContent = data.currentRound;
   const container = document.getElementById('home-groups');
   
-  if (data.groups.length === 0) {
-    container.innerHTML = '<div class="card"><p>暂无分组，请前往管理页面生成分组</p></div>';
-    return;
-  }
-
-  const currentMatches = data.matches.filter(m => m.round === data.currentRound);
   let html = '';
-
-  data.groups.sort((a, b) => a.level - b.level).forEach(group => {
-    const groupMatches = currentMatches.filter(m => m.groupId === group.id);
-    const rankings = group.playerIds.map(id => {
-      const stats = calculatePlayerStats(id, groupMatches);
-      return { id, name: getPlayerName(id), ...stats };
-    }).sort((a, b) => b.netScore - a.netScore);
-
-    html += `<div class="card">
-      <h2>第 ${group.level} 组 (${group.playerIds.length}人)</h2>
-      <table>
-        <thead><tr><th>排名</th><th>选手</th><th style="text-align:center;">净胜分</th></tr></thead>
-        <tbody>`;
+  
+  Object.keys(CATEGORIES).forEach(cat => {
+    const catGroups = data.groups.filter(g => g.category === cat).sort((a, b) => a.level - b.level);
     
-    rankings.forEach((p, i) => {
-      html += `<tr><td>${i+1}</td><td>${p.name}</td><td style="text-align:center;">${p.netScore > 0 ? '+' : ''}${p.netScore}</td></tr>`;
-    });
+    if (catGroups.length === 0) return;
+    
+    html += `<h2 style="color:#4CAF50;margin-top:30px;margin-bottom:15px;">${CATEGORIES[cat]}</h2>`;
+    
+    const currentMatches = data.matches.filter(m => m.round === data.currentRound && m.category === cat);
+    
+    catGroups.forEach(group => {
+      const groupMatches = currentMatches.filter(m => m.groupId === group.id);
+      const rankings = group.playerIds.map(id => {
+        const stats = calculatePlayerStats(id, groupMatches);
+        return { id, name: getPlayerName(id), ...stats };
+      }).sort((a, b) => b.netScore - a.netScore);
 
-    html += `</tbody></table><div class="mt-20"><h3>本组比赛</h3>`;
-    groupMatches.forEach(m => {
-      const status = m.completed ? 'match-completed' : 'match-pending';
-      const score = m.completed ? `${m.score1} : ${m.score2}` : '待比赛';
-      html += `<div class="match-item ${status}">
-        <span>${m.team1.map(getPlayerName).join(' / ')} vs ${m.team2.map(getPlayerName).join(' / ')}</span>
-        <span style="font-weight:bold;">${score}</span>
-      </div>`;
+      html += `<div class="card">
+        <h2>第 ${group.level} 组 (${group.playerIds.length}人)</h2>
+        <table>
+          <thead><tr><th>排名</th><th>选手</th><th style="text-align:center;">净胜分</th></tr></thead>
+          <tbody>`;
+      
+      rankings.forEach((p, i) => {
+        html += `<tr><td>${i+1}</td><td>${p.name}</td><td style="text-align:center;">${p.netScore > 0 ? '+' : ''}${p.netScore}</td></tr>`;
+      });
+
+      html += `</tbody></table>`;
+      
+      if (groupMatches.length > 0) {
+        html += `<div class="mt-20"><h3>本组比赛</h3>`;
+        groupMatches.forEach(m => {
+          const status = m.completed ? 'match-completed' : 'match-pending';
+          const score = m.completed ? `${m.score1} : ${m.score2}` : '待比赛';
+          html += `<div class="match-item ${status}">
+            <span>${m.team1.map(getPlayerName).join(' / ')} vs ${m.team2.map(getPlayerName).join(' / ')}</span>
+            <span style="font-weight:bold;">${score}</span>
+          </div>`;
+        });
+        html += `</div>`;
+      } else {
+        html += `<div class="mt-20"><p style="color:#ff9800;">人数不符合分组规则，暂无比赛</p></div>`;
+      }
+      
+      html += `</div>`;
     });
-    html += `</div></div>`;
   });
+  
+  if (!html) {
+    html = '<div class="card"><p>暂无分组，请前往管理页面生成分组</p></div>';
+  }
 
   container.innerHTML = html;
 }
@@ -157,8 +186,15 @@ function renderScore() {
   const pending = currentMatches.filter(m => !m.completed);
 
   select.innerHTML = '<option value="">-- 请选择 --</option>';
-  pending.forEach(m => {
-    select.innerHTML += `<option value="${m.id}">${m.team1.map(getPlayerName).join('/')} vs ${m.team2.map(getPlayerName).join('/')}</option>`;
+  
+  Object.keys(CATEGORIES).forEach(cat => {
+    const catPending = pending.filter(m => m.category === cat);
+    if (catPending.length > 0) {
+      select.innerHTML += `<option disabled style="font-weight:bold;">--- ${CATEGORIES[cat]} ---</option>`;
+      catPending.forEach(m => {
+        select.innerHTML += `<option value="${m.id}">${m.team1.map(getPlayerName).join('/')} vs ${m.team2.map(getPlayerName).join('/')}</option>`;
+      });
+    }
   });
 
   const completed = currentMatches.filter(m => m.completed);
@@ -255,13 +291,19 @@ function renderRanking() {
   const container = document.getElementById('ranking-list');
   let html = '';
   
-  data.players.forEach((p, index) => {
-    const statusClass = p.active ? '' : 'player-inactive';
-    html += `<div class="ranking-item ${statusClass}">
-      <span style="font-weight:bold;min-width:40px;">#${index + 1}</span>
-      <span style="flex:1;">${p.name}</span>
-      <span style="color:#666;">${p.active ? '参赛' : '未参赛'}</span>
-    </div>`;
+  Object.keys(CATEGORIES).forEach(cat => {
+    const catPlayers = data.players.filter(p => p.category === cat).sort((a, b) => a.ranking - b.ranking);
+    if (catPlayers.length === 0) return;
+    
+    html += `<h2 style="color:#4CAF50;margin-top:20px;margin-bottom:15px;">${CATEGORIES[cat]}</h2>`;
+    catPlayers.forEach((p, index) => {
+      const statusClass = p.active ? '' : 'player-inactive';
+      html += `<div class="ranking-item ${statusClass}">
+        <span style="font-weight:bold;min-width:40px;">#${index + 1}</span>
+        <span style="flex:1;">${p.name}</span>
+        <span style="color:#666;">${p.active ? '参赛' : '未参赛'}</span>
+      </div>`;
+    });
   });
   
   container.innerHTML = html || '<p>暂无选手</p>';
@@ -286,22 +328,29 @@ function renderHistory() {
     const roundHistory = data.roundHistory.find(rh => rh.round === r);
     if (roundHistory) {
       html += '<h3 style="margin-top:15px;">本轮排名与升降级</h3>';
-      html += '<table style="margin-bottom:15px;"><thead><tr><th>排名</th><th>选手</th><th style="text-align:center;">组别</th><th style="text-align:center;">净胜分</th><th style="text-align:center;">升降级</th></tr></thead><tbody>';
-      roundHistory.rankings.forEach((item, index) => {
-        let changeIcon = '';
-        if (item.change === 'promoted') changeIcon = '<span style="color:#4CAF50;">↑ 升级</span>';
-        else if (item.change === 'relegated') changeIcon = '<span style="color:#f44336;">↓ 降级</span>';
-        else changeIcon = '<span style="color:#999;">-</span>';
+      
+      Object.keys(CATEGORIES).forEach(cat => {
+        const catRankings = roundHistory.rankings.filter(item => item.category === cat);
+        if (catRankings.length === 0) return;
         
-        html += `<tr>
-          <td>${index + 1}</td>
-          <td>${item.name}</td>
-          <td style="text-align:center;">第${item.group}组</td>
-          <td style="text-align:center;">${item.netScore > 0 ? '+' : ''}${item.netScore}</td>
-          <td style="text-align:center;">${changeIcon}</td>
-        </tr>`;
+        html += `<h4 style="color:#4CAF50;margin-top:15px;">${CATEGORIES[cat]}</h4>`;
+        html += '<table style="margin-bottom:15px;"><thead><tr><th>排名</th><th>选手</th><th style="text-align:center;">组别</th><th style="text-align:center;">净胜分</th><th style="text-align:center;">升降级</th></tr></thead><tbody>';
+        catRankings.forEach((item, index) => {
+          let changeIcon = '';
+          if (item.change === 'promoted') changeIcon = '<span style="color:#4CAF50;">↑ 升级</span>';
+          else if (item.change === 'relegated') changeIcon = '<span style="color:#f44336;">↓ 降级</span>';
+          else changeIcon = '<span style="color:#999;">-</span>';
+          
+          html += `<tr>
+            <td>${index + 1}</td>
+            <td>${item.name}</td>
+            <td style="text-align:center;">第${item.group}组</td>
+            <td style="text-align:center;">${item.netScore > 0 ? '+' : ''}${item.netScore}</td>
+            <td style="text-align:center;">${changeIcon}</td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
       });
-      html += '</tbody></table>';
     }
     
     html += '<h3>比赛结果</h3>';
@@ -327,29 +376,42 @@ function renderAdmin() {
   document.getElementById('active-count').textContent = activePlayers.length;
   
   let html = '';
-  data.players.forEach((p, index) => {
-    const statusClass = p.active ? '' : 'player-inactive';
-    const statusBtn = p.active 
-      ? `<button onclick="togglePlayerActive('${p.id}')" class="btn-warning" style="padding:5px 10px;font-size:12px;">停用</button>`
-      : `<button onclick="togglePlayerActive('${p.id}')" class="btn-info" style="padding:5px 10px;font-size:12px;">启用</button>`;
+  Object.keys(CATEGORIES).forEach(cat => {
+    const catPlayers = data.players.filter(p => p.category === cat).sort((a, b) => a.ranking - b.ranking);
+    if (catPlayers.length === 0) return;
     
-    html += `<div class="ranking-item ${statusClass}">
-      <span style="font-weight:bold;min-width:40px;">#${index + 1}</span>
-      <span style="flex:1;">${p.name}</span>
-      <div style="display:flex;gap:5px;">
-        ${statusBtn}
-        <button onclick="deletePlayer('${p.id}')" class="btn-danger" style="padding:5px 10px;font-size:12px;">删除</button>
-      </div>
-    </div>`;
+    html += `<h3 style="color:#4CAF50;margin-top:20px;margin-bottom:10px;">${CATEGORIES[cat]}</h3>`;
+    catPlayers.forEach((p, index) => {
+      const statusClass = p.active ? '' : 'player-inactive';
+      const statusBtn = p.active 
+        ? `<button onclick="togglePlayerActive('${p.id}')" class="btn-warning" style="padding:5px 10px;font-size:12px;">停用</button>`
+        : `<button onclick="togglePlayerActive('${p.id}')" class="btn-info" style="padding:5px 10px;font-size:12px;">启用</button>`;
+      
+      html += `<div class="ranking-item ${statusClass}">
+        <span style="font-weight:bold;min-width:40px;">#${index + 1}</span>
+        <span style="flex:1;">${p.name}</span>
+        <span style="color:#666;margin-right:10px;">${CATEGORIES[p.category]}</span>
+        <div style="display:flex;gap:5px;">
+          <button onclick="changePlayerCategory('${p.id}')" class="btn-info" style="padding:5px 10px;font-size:12px;">改类别</button>
+          ${statusBtn}
+          <button onclick="deletePlayer('${p.id}')" class="btn-danger" style="padding:5px 10px;font-size:12px;">删除</button>
+        </div>
+      </div>`;
+    });
   });
   document.getElementById('player-ranking-list').innerHTML = html || '<p>暂无选手</p>';
 
   if (data.groups.length > 0) {
     html = '<h3>当前分组</h3>';
-    data.groups.sort((a, b) => a.level - b.level).forEach(g => {
-      html += `<div style="padding:10px;background:#f5f5f5;border-radius:6px;margin-bottom:8px;">
-        <strong>第 ${g.level} 组（${g.playerIds.length}人）：</strong>${g.playerIds.map(getPlayerName).join(', ')}
-      </div>`;
+    Object.keys(CATEGORIES).forEach(cat => {
+      const catGroups = data.groups.filter(g => g.category === cat).sort((a, b) => a.level - b.level);
+      if (catGroups.length === 0) return;
+      html += `<h4 style="color:#4CAF50;margin-top:15px;">${CATEGORIES[cat]}</h4>`;
+      catGroups.forEach(g => {
+        html += `<div style="padding:10px;background:#f5f5f5;border-radius:6px;margin-bottom:8px;">
+          <strong>第 ${g.level} 组（${g.playerIds.length}人）：</strong>${g.playerIds.map(getPlayerName).join('、')}
+        </div>`;
+      });
     });
     document.getElementById('current-groups').innerHTML = html;
   } else {
@@ -368,18 +430,109 @@ function renderAdmin() {
   document.getElementById('stat-completed').textContent = currentMatches.filter(m => m.completed).length;
 }
 
+function changePlayerCategory(id) {
+  const player = data.players.find(p => p.id === id);
+  if (!player) return;
+  
+  const newCat = prompt(`${player.name} 当前类别：${CATEGORIES[player.category]}\n\n请输入新类别：\n1 - 男双\n2 - 女双\n3 - 娱乐`);
+  
+  const catMap = {'1': 'male', '2': 'female', '3': 'fun'};
+  const selectedCat = catMap[newCat];
+  
+  if (!selectedCat) {
+    alert('无效的类别');
+    return;
+  }
+  
+  if (selectedCat === player.category) {
+    alert('类别未改变');
+    return;
+  }
+  
+  const oldCat = player.category;
+  
+  data.groups.forEach(g => {
+    if (g.playerIds.includes(id)) {
+      g.playerIds = g.playerIds.filter(pid => pid !== id);
+    }
+  });
+  
+  const newCatPlayers = data.players.filter(p => p.category === selectedCat);
+  player.category = selectedCat;
+  player.ranking = newCatPlayers.length + 1;
+  data.rankingModified = true;
+  
+  saveData();
+  alert(`${player.name} 已改为${CATEGORIES[selectedCat]}，排名第${player.ranking}名`);
+  renderAdmin();
+  renderHome();
+  
+  checkCategoriesAfterChange(oldCat, selectedCat);
+}
+
+function checkCategoriesAfterChange(oldCat, newCat) {
+  const currentMatches = data.matches.filter(m => m.round === data.currentRound);
+  const hasStarted = currentMatches.some(m => m.completed);
+  
+  if (hasStarted) {
+    alert('比赛已开始，无法调整分组');
+    return;
+  }
+  
+  const oldCatActive = data.players.filter(p => p.active && p.category === oldCat).length;
+  const newCatActive = data.players.filter(p => p.active && p.category === newCat).length;
+  
+  let needRegroup = false;
+  let message = '类别人数变化：\n';
+  
+  if (oldCatActive === 3 || oldCatActive === 7) {
+    message += `${CATEGORIES[oldCat]}现有${oldCatActive}人，无法分组，请添加/启用或停用选手\n`;
+    removeMatchesOnly(oldCat);
+  }
+  
+  if (newCatActive === 7) {
+    message += `${CATEGORIES[newCat]}现有${newCatActive}人，无法分组，请添加/启用或停用选手\n`;
+    removeMatchesOnly(newCat);
+  }
+  
+  if (oldCatActive === 3 || oldCatActive === 7 || newCatActive === 7) {
+    alert(message);
+    renderHome();
+    renderScore();
+    return;
+  }
+  
+  if (oldCatActive >= 4 || newCatActive >= 4) {
+    message += `\n${CATEGORIES[oldCat]}: ${oldCatActive}人\n${CATEGORIES[newCat]}: ${newCatActive}人\n\n是否重新生成分组？`;
+    if (confirm(message)) {
+      generateWeeklyGroups();
+    }
+  }
+}
+
+function removeMatchesOnly(category) {
+  data.matches = data.matches.filter(m => m.round !== data.currentRound || m.category !== category);
+  saveData();
+  renderAdmin();
+  renderHome();
+  renderScore();
+}
+
 function addPlayer() {
+  const category = document.getElementById('new-player-category').value;
   const name = document.getElementById('new-player-name').value.trim();
   if (!name) {
     alert('请输入选手姓名');
     return;
   }
   
+  const catPlayers = data.players.filter(p => p.category === category);
   const newPlayer = { 
     id: `player-${Date.now()}`, 
     name, 
     active: true,
-    ranking: data.players.length + 1
+    category: category,
+    ranking: catPlayers.length + 1
   };
   
   data.players.push(newPlayer);
@@ -388,6 +541,8 @@ function addPlayer() {
   document.getElementById('new-player-name').value = '';
   alert('选手已添加！');
   renderAdmin();
+  
+  checkAndPromptRegroup(category, 'add');
 }
 
 function deletePlayer(id) {
@@ -409,11 +564,65 @@ function deletePlayer(id) {
 
 function togglePlayerActive(id) {
   const player = data.players.find(p => p.id === id);
-  if (player) {
-    player.active = !player.active;
-    data.rankingModified = true;
+  if (!player) return;
+  
+  player.active = !player.active;
+  data.rankingModified = true;
+  saveData();
+  renderAdmin();
+  
+  if (player.active) {
+    checkAndPromptRegroup(player.category, 'enable');
+  } else {
+    handleDeactivation(id, player.category);
+  }
+}
+
+function checkAndPromptRegroup(category, action) {
+  const activePlayers = data.players.filter(p => p.active && p.category === category);
+  const total = activePlayers.length;
+  
+  if (total < 4) {
+    alert(`${CATEGORIES[category]}只有${total}人，至少需要4人才能分组`);
+    removeMatchesOnly(category);
+    return;
+  }
+  
+  if (total === 7) {
+    alert(`${CATEGORIES[category]}有7人无法分组\n请再添加/启用一人，或停用一人`);
+    removeMatchesOnly(category);
+    return;
+  }
+  
+  if (confirm(`${CATEGORIES[category]}现有${total}人参赛\n是否重新生成分组？`)) {
+    generateWeeklyGroups();
+  }
+}
+
+function handleDeactivation(playerId, category) {
+  const currentMatches = data.matches.filter(m => m.round === data.currentRound);
+  const hasStarted = currentMatches.some(m => m.completed);
+  
+  if (hasStarted || data.groups.length === 0) return;
+  
+  const group = data.groups.find(g => g.playerIds.includes(playerId));
+  if (!group) return;
+  
+  group.playerIds = group.playerIds.filter(id => id !== playerId);
+  const newSize = group.playerIds.length;
+  
+  if (newSize === 3) {
+    alert(`${CATEGORIES[category]}第${group.level}组只剩3人\n请添加/启用一人，或重新分组`);
+    removeMatchesOnly(category);
+  } else if (newSize >= 4 && newSize <= 6) {
+    const newMatches = generateMatches(group.id, group.playerIds, data.currentRound).map(m => ({...m, category: group.category}));
+    data.matches = data.matches.filter(m => m.groupId !== group.id || m.round !== data.currentRound);
+    data.matches.push(...newMatches);
     saveData();
+    alert(`${CATEGORIES[category]}第${group.level}组已调整为${newSize}人`);
     renderAdmin();
+    renderHome();
+    renderScore();
   }
 }
 
@@ -424,27 +633,43 @@ function editPlayerRanking() {
     return;
   }
   
+  const catChoice = prompt('请选择类别：\n1 - 男双\n2 - 女双\n3 - 娱乐');
+  const catMap = {'1': 'male', '2': 'female', '3': 'fun'};
+  const selectedCat = catMap[catChoice];
+  
+  if (!selectedCat) {
+    alert('无效的类别');
+    return;
+  }
+  
+  const catPlayers = data.players.filter(p => p.category === selectedCat).sort((a, b) => a.ranking - b.ranking);
+  
+  if (catPlayers.length === 0) {
+    alert(`${CATEGORIES[selectedCat]}暂无选手`);
+    return;
+  }
+  
   let options = '';
-  data.players.forEach((p, i) => {
+  catPlayers.forEach((p, i) => {
     options += `${i + 1}. ${p.name}\n`;
   });
   
-  const selected = prompt(`请选择要修改排名的选手（输入序号）：\n\n${options}`);
+  const selected = prompt(`${CATEGORIES[selectedCat]}选手列表（按当前排名）：\n\n${options}\n请输入序号选择要修改排名的选手：`);
   if (!selected) return;
   
   const selectedIndex = parseInt(selected) - 1;
-  if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= data.players.length) {
+  if (isNaN(selectedIndex) || selectedIndex < 0 || selectedIndex >= catPlayers.length) {
     alert('无效的选择');
     return;
   }
   
-  const player = data.players[selectedIndex];
+  const player = catPlayers[selectedIndex];
   const currentRank = selectedIndex + 1;
-  const newRank = prompt(`${player.name} 当前排名：第 ${currentRank} 名\n\n请输入新排名（1-${data.players.length}）：`);
+  const newRank = prompt(`${player.name} 当前排名：第 ${currentRank} 名\n\n请输入新排名（1-${catPlayers.length}）：`);
   if (!newRank) return;
   
   const newRankNum = parseInt(newRank);
-  if (isNaN(newRankNum) || newRankNum < 1 || newRankNum > data.players.length) {
+  if (isNaN(newRankNum) || newRankNum < 1 || newRankNum > catPlayers.length) {
     alert('无效的排名');
     return;
   }
@@ -454,21 +679,87 @@ function editPlayerRanking() {
     return;
   }
   
-  data.players.splice(selectedIndex, 1);
-  data.players.splice(newRankNum - 1, 0, player);
+  catPlayers.splice(selectedIndex, 1);
+  catPlayers.splice(newRankNum - 1, 0, player);
   
-  data.players.forEach((p, index) => {
+  catPlayers.forEach((p, index) => {
     p.ranking = index + 1;
   });
   
   data.rankingModified = true;
-  saveData();
   
+  const oldGroups = JSON.parse(JSON.stringify(data.groups.filter(g => g.category === selectedCat)));
+  
+  data.groups = data.groups.filter(g => g.category !== selectedCat);
+  
+  const activePlayers = catPlayers.filter(p => p.active);
+  const total = activePlayers.length;
+  
+  if (total >= 4 && total !== 7) {
+    const groupSizes = [];
+    if (total === 4) groupSizes.push(4);
+    else if (total === 5) groupSizes.push(5);
+    else if (total === 6) groupSizes.push(6);
+    else if (total === 8) groupSizes.push(4, 4);
+    else if (total === 9) groupSizes.push(4, 5);
+    else if (total === 10) groupSizes.push(5, 5);
+    else if (total === 11) groupSizes.push(6, 5);
+    else if (total === 12) groupSizes.push(4, 4, 4);
+    else if (total === 13) groupSizes.push(4, 4, 5);
+    else if (total === 14) groupSizes.push(4, 5, 5);
+    else if (total === 15) groupSizes.push(5, 5, 5);
+    else if (total === 16) groupSizes.push(4, 4, 4, 4);
+    else if (total === 17) groupSizes.push(4, 4, 4, 5);
+    else if (total === 18) groupSizes.push(4, 4, 5, 5);
+    else if (total === 19) groupSizes.push(4, 5, 5, 5);
+    else if (total === 20) groupSizes.push(4, 4, 4, 4, 4);
+    else {
+      const numFives = total % 4;
+      const numFours = (total - numFives * 5) / 4;
+      for (let i = 0; i < numFours; i++) groupSizes.push(4);
+      for (let i = 0; i < numFives; i++) groupSizes.push(5);
+    }
+
+    let playerIndex = 0;
+    groupSizes.forEach((size, index) => {
+      const playerIds = activePlayers.slice(playerIndex, playerIndex + size).map(p => p.id);
+      const groupId = `${selectedCat}-group-${index + 1}`;
+      data.groups.push({ id: groupId, level: index + 1, playerIds, category: selectedCat });
+      playerIndex += size;
+    });
+  }
+  
+  const newGroups = data.groups.filter(g => g.category === selectedCat);
+  let groupsChanged = oldGroups.length !== newGroups.length;
+  
+  if (!groupsChanged && oldGroups.length > 0) {
+    for (let i = 0; i < oldGroups.length; i++) {
+      if (oldGroups[i].playerIds.length !== newGroups[i].playerIds.length ||
+          !oldGroups[i].playerIds.every((id, idx) => id === newGroups[i].playerIds[idx])) {
+        groupsChanged = true;
+        break;
+      }
+    }
+  }
+  
+  saveData();
   alert(`${player.name} 已调整为第 ${newRankNum} 名！`);
   renderAdmin();
+  renderHome();
   
-  if (confirm('是否需要立即重新分组？')) {
-    generateWeeklyGroups();
+  if (groupsChanged) {
+    if (confirm('排名修改导致分组变化，是否重新生成比赛对阵？')) {
+      data.matches = data.matches.filter(m => m.round !== data.currentRound || m.category !== selectedCat);
+      const newMatches = [];
+      newGroups.forEach(g => {
+        newMatches.push(...generateMatches(g.id, g.playerIds, data.currentRound).map(m => ({...m, category: selectedCat})));
+      });
+      data.matches.push(...newMatches);
+      saveData();
+      alert('比赛对阵已重新生成！');
+      renderHome();
+      renderScore();
+    }
   }
 }
 
@@ -576,96 +867,71 @@ function saveGroupEdits() {
   renderAdmin();
 }
 
-function editRankings() {
-  const password = prompt('编辑排名需要管理员密码：');
-  if (password !== data.adminPassword) {
-    alert('密码错误！');
-    return;
-  }
-  
-  let rankingText = '当前排名（每行一个选手名字，从第1名到最后）：\n\n';
-  rankingText += data.players.map(p => p.name).join('\n');
-  
-  const newRanking = prompt(rankingText, data.players.map(p => p.name).join('\n'));
-  if (!newRanking) return;
-  
-  const names = newRanking.split('\n').map(n => n.trim()).filter(n => n);
-  
-  if (names.length !== data.players.length) {
-    alert('选手数量不匹配！');
-    return;
-  }
-  
-  const newPlayers = [];
-  for (let i = 0; i < names.length; i++) {
-    const player = data.players.find(p => p.name === names[i]);
-    if (!player) {
-      alert(`找不到选手：${names[i]}`);
-      return;
-    }
-    player.ranking = i + 1;
-    newPlayers.push(player);
-  }
-  
-  data.players = newPlayers;
-  data.rankingModified = true;
-  saveData();
-  alert('排名已更新！');
-  renderAdmin();
-}
+
 
 function generateWeeklyGroups() {
   if (!data.rankingModified && data.groups.length > 0) {
     alert('排名未修改且已有分组，无需重新生成。\n如需重新分组，请先修改排名或调整人员。');
     return;
   }
-  
-  const activePlayers = data.players.filter(p => p.active);
-  
-  if (activePlayers.length < 4) {
-    alert('至少需要4名参赛选手才能分组');
-    return;
-  }
 
   data.matches = data.matches.filter(m => m.round !== data.currentRound);
-
   data.groups = [];
-  let groupIndex = 0;
-  let playerIndex = 0;
-
-  while (playerIndex < activePlayers.length) {
-    const remaining = activePlayers.length - playerIndex;
-    let groupSize;
+  
+  const newMatches = [];
+  let totalGroups = 0;
+  
+  Object.keys(CATEGORIES).forEach(cat => {
+    const activePlayers = data.players.filter(p => p.active && p.category === cat).sort((a, b) => a.ranking - b.ranking);
+    const total = activePlayers.length;
     
-    if (remaining === 7 || remaining === 3 || remaining === 2 || remaining === 1) {
-      alert(`剩余 ${remaining} 人无法分组。\n分组只支持4、5、6人。\n建议调整参赛人数。`);
+    if (total < 4) return;
+    if (total === 7) {
+      alert(`${CATEGORIES[cat]}有7人无法分组，请调整人数`);
       return;
-    } else if (remaining === 10) {
-      groupSize = 5;
-    } else if (remaining === 6) {
-      groupSize = 6;
-    } else if (remaining === 5) {
-      groupSize = 5;
-    } else {
-      groupSize = 4;
+    }
+    
+    const groupSizes = [];
+    if (total === 4) groupSizes.push(4);
+    else if (total === 5) groupSizes.push(5);
+    else if (total === 6) groupSizes.push(6);
+    else if (total === 8) groupSizes.push(4, 4);
+    else if (total === 9) groupSizes.push(4, 5);
+    else if (total === 10) groupSizes.push(5, 5);
+    else if (total === 11) groupSizes.push(6, 5);
+    else if (total === 12) groupSizes.push(4, 4, 4);
+    else if (total === 13) groupSizes.push(4, 4, 5);
+    else if (total === 14) groupSizes.push(4, 5, 5);
+    else if (total === 15) groupSizes.push(5, 5, 5);
+    else if (total === 16) groupSizes.push(4, 4, 4, 4);
+    else if (total === 17) groupSizes.push(4, 4, 4, 5);
+    else if (total === 18) groupSizes.push(4, 4, 5, 5);
+    else if (total === 19) groupSizes.push(4, 5, 5, 5);
+    else if (total === 20) groupSizes.push(4, 4, 4, 4, 4);
+    else {
+      const numFives = total % 4;
+      const numFours = (total - numFives * 5) / 4;
+      for (let i = 0; i < numFours; i++) groupSizes.push(4);
+      for (let i = 0; i < numFives; i++) groupSizes.push(5);
     }
 
-    const playerIds = activePlayers.slice(playerIndex, playerIndex + groupSize).map(p => p.id);
-    data.groups.push({ id: `group-${groupIndex + 1}`, level: groupIndex + 1, playerIds });
-    playerIndex += groupSize;
-    groupIndex++;
-  }
-
-  const newMatches = [];
-  data.groups.forEach(g => {
-    newMatches.push(...generateMatches(g.id, g.playerIds, data.currentRound));
+    let playerIndex = 0;
+    groupSizes.forEach((size, index) => {
+      const playerIds = activePlayers.slice(playerIndex, playerIndex + size).map(p => p.id);
+      const groupId = `${cat}-group-${index + 1}`;
+      data.groups.push({ id: groupId, level: index + 1, playerIds, category: cat });
+      newMatches.push(...generateMatches(groupId, playerIds, data.currentRound).map(m => ({...m, category: cat})));
+      playerIndex += size;
+      totalGroups++;
+    });
   });
+  
   data.matches.push(...newMatches);
-
   data.rankingModified = false;
   saveData();
-  alert(`已生成第 ${data.currentRound} 轮分组，共 ${data.groups.length} 个组，${newMatches.length} 场比赛`);
+  alert(`已生成第 ${data.currentRound} 轮分组，共 ${totalGroups} 个组，${newMatches.length} 场比赛`);
   renderAdmin();
+  renderHome();
 }
 
 function finishRound() {
@@ -681,107 +947,112 @@ function finishRound() {
     if (!confirm(msg)) return;
   }
 
-  const groupRankings = data.groups.map(g => {
-    const gm = currentMatches.filter(m => m.groupId === g.id);
-    const rankings = g.playerIds.map(id => {
-      const stats = calculatePlayerStats(id, gm);
-      return { id, netScore: stats.netScore };
-    }).sort((a, b) => b.netScore - a.netScore);
-    return { groupId: g.id, level: g.level, rankings };
-  });
-
-  const sorted = groupRankings.sort((a, b) => a.level - b.level);
-  
   const roundRankings = [];
-  sorted.forEach(group => {
-    group.rankings.forEach((r, idx) => {
-      const player = data.players.find(p => p.id === r.id);
-      let change = 'none';
-      if (group.level > 1 && idx === 0) change = 'promoted';
-      if (group.level < sorted.length && idx === group.rankings.length - 1) change = 'relegated';
-      roundRankings.push({
-        name: player.name,
-        group: group.level,
-        netScore: r.netScore,
-        change: change
+  
+  Object.keys(CATEGORIES).forEach(cat => {
+    const catGroups = data.groups.filter(g => g.category === cat).sort((a, b) => a.level - b.level);
+    if (catGroups.length === 0) return;
+    
+    const groupRankings = catGroups.map(g => {
+      const gm = currentMatches.filter(m => m.groupId === g.id);
+      const rankings = g.playerIds.map(id => {
+        const stats = calculatePlayerStats(id, gm);
+        return { id, netScore: stats.netScore };
+      }).sort((a, b) => b.netScore - a.netScore);
+      return { groupId: g.id, level: g.level, rankings };
+    });
+    
+    groupRankings.forEach((group, idx) => {
+      group.rankings.forEach((r, rankIdx) => {
+        const player = data.players.find(p => p.id === r.id);
+        let change = 'none';
+        if (idx > 0 && rankIdx === 0) change = 'promoted';
+        if (idx < groupRankings.length - 1 && rankIdx === group.rankings.length - 1) change = 'relegated';
+        roundRankings.push({
+          name: player.name,
+          category: cat,
+          group: group.level,
+          netScore: r.netScore,
+          change: change
+        });
       });
     });
-  });
-  
-  data.roundHistory.push({
-    round: data.currentRound,
-    rankings: roundRankings
-  });
-  
-  const newRanking = [];
-  
-  for (let i = 0; i < sorted.length; i++) {
-    const current = sorted[i];
-    const rankings = current.rankings;
     
-    if (i === 0) {
-      newRanking.push(...rankings.map(r => r.id));
-    } else {
-      const promoted = sorted[i].rankings[0].id;
-      const relegated = sorted[i - 1].rankings[sorted[i - 1].rankings.length - 1].id;
-      
-      const upperGroup = newRanking.slice(0, newRanking.length - 1);
-      upperGroup.push(promoted);
-      upperGroup.push(relegated);
-      
-      newRanking.splice(newRanking.length - 1, 1, ...upperGroup.slice(-2));
-      
-      if (i < sorted.length - 1) {
-        newRanking.push(...rankings.slice(1).map(r => r.id));
+    const newRanking = [];
+    for (let i = 0; i < groupRankings.length; i++) {
+      const rankings = groupRankings[i].rankings;
+      if (i === 0) {
+        newRanking.push(...rankings.map(r => r.id));
       } else {
+        const promoted = rankings[0].id;
+        const relegated = groupRankings[i - 1].rankings[groupRankings[i - 1].rankings.length - 1].id;
+        newRanking.splice(newRanking.length - 1, 1, promoted, relegated);
         newRanking.push(...rankings.slice(1).map(r => r.id));
       }
     }
-  }
-  
-  newRanking.forEach((playerId, index) => {
-    const player = data.players.find(p => p.id === playerId);
-    if (player) player.ranking = index + 1;
+    
+    newRanking.forEach((playerId, index) => {
+      const player = data.players.find(p => p.id === playerId);
+      if (player) {
+        player.ranking = index + 1;
+      }
+    });
   });
   
-  data.players.sort((a, b) => a.ranking - b.ranking);
+  data.roundHistory.push({ round: data.currentRound, rankings: roundRankings });
   data.currentRound++;
   data.rankingModified = false;
   
-  const activePlayers = data.players.filter(p => p.active);
   data.groups = [];
-  let groupIndex = 0;
-  let playerIndex = 0;
-
-  while (playerIndex < activePlayers.length) {
-    const remaining = activePlayers.length - playerIndex;
-    let groupSize;
+  const newMatches = [];
+  let totalGroups = 0;
+  
+  Object.keys(CATEGORIES).forEach(cat => {
+    const activePlayers = data.players.filter(p => p.active && p.category === cat).sort((a, b) => a.ranking - b.ranking);
+    const total = activePlayers.length;
+    if (total < 4 || total === 7) return;
     
-    if (remaining === 10) {
-      groupSize = 5;
-    } else if (remaining === 6) {
-      groupSize = 6;
-    } else if (remaining === 5) {
-      groupSize = 5;
-    } else {
-      groupSize = 4;
+    const groupSizes = [];
+    if (total === 4) groupSizes.push(4);
+    else if (total === 5) groupSizes.push(5);
+    else if (total === 6) groupSizes.push(6);
+    else if (total === 8) groupSizes.push(4, 4);
+    else if (total === 9) groupSizes.push(4, 5);
+    else if (total === 10) groupSizes.push(5, 5);
+    else if (total === 11) groupSizes.push(6, 5);
+    else if (total === 12) groupSizes.push(4, 4, 4);
+    else if (total === 13) groupSizes.push(4, 4, 5);
+    else if (total === 14) groupSizes.push(4, 5, 5);
+    else if (total === 15) groupSizes.push(5, 5, 5);
+    else if (total === 16) groupSizes.push(4, 4, 4, 4);
+    else if (total === 17) groupSizes.push(4, 4, 4, 5);
+    else if (total === 18) groupSizes.push(4, 4, 5, 5);
+    else if (total === 19) groupSizes.push(4, 5, 5, 5);
+    else if (total === 20) groupSizes.push(4, 4, 4, 4, 4);
+    else {
+      const numFives = total % 4;
+      const numFours = (total - numFives * 5) / 4;
+      for (let i = 0; i < numFours; i++) groupSizes.push(4);
+      for (let i = 0; i < numFives; i++) groupSizes.push(5);
     }
 
-    const playerIds = activePlayers.slice(playerIndex, playerIndex + groupSize).map(p => p.id);
-    data.groups.push({ id: `group-${groupIndex + 1}`, level: groupIndex + 1, playerIds });
-    playerIndex += groupSize;
-    groupIndex++;
-  }
-
-  const newMatches = [];
-  data.groups.forEach(g => {
-    newMatches.push(...generateMatches(g.id, g.playerIds, data.currentRound));
+    let playerIndex = 0;
+    groupSizes.forEach((size, index) => {
+      const playerIds = activePlayers.slice(playerIndex, playerIndex + size).map(p => p.id);
+      const groupId = `${cat}-group-${index + 1}`;
+      data.groups.push({ id: groupId, level: index + 1, playerIds, category: cat });
+      newMatches.push(...generateMatches(groupId, playerIds, data.currentRound).map(m => ({...m, category: cat})));
+      playerIndex += size;
+      totalGroups++;
+    });
   });
-  data.matches.push(...newMatches);
   
+  data.matches.push(...newMatches);
   saveData();
-  alert(`第 ${data.currentRound - 1} 轮结束！升降级已完成。\n已自动生成第 ${data.currentRound} 轮分组，共 ${data.groups.length} 个组，${newMatches.length} 场比赛`);
+  alert(`第 ${data.currentRound - 1} 轮结束！升降级已完成。\n已自动生成第 ${data.currentRound} 轮分组，共 ${totalGroups} 个组，${newMatches.length} 场比赛`);
   renderAdmin();
+  renderHome();
+  renderRanking();
 }
 
 function exportData() {
@@ -866,4 +1137,53 @@ function resetAllData() {
   data = { players: [], groups: [], matches: [], currentRound: 1, adminPassword: 'e52026', rankingModified: false, roundHistory: [] };
   alert('数据已清空');
   location.reload();
+}
+
+
+function autoFillScores() {
+  const password = prompt('随机报分需要管理员密码：');
+  if (password !== data.adminPassword) {
+    alert('密码错误！');
+    return;
+  }
+  
+  if (!confirm('确定要为所有未完成的比赛随机生成分数吗？')) return;
+  
+  const currentMatches = data.matches.filter(m => m.round === data.currentRound && !m.completed);
+  
+  if (currentMatches.length === 0) {
+    alert('没有待报分的比赛');
+    return;
+  }
+  
+  currentMatches.forEach(m => {
+    const winner = Math.random() > 0.5 ? 1 : 2;
+    const winScoreType = Math.random();
+    let winScore, loseScore;
+    
+    if (winScoreType < 0.7) {
+      winScore = 21;
+      loseScore = Math.floor(Math.random() * 10) + 10;
+    } else if (winScoreType < 0.85) {
+      winScore = 22;
+      loseScore = 20;
+    } else {
+      winScore = 23;
+      loseScore = 21;
+    }
+    
+    const score1 = winner === 1 ? winScore : loseScore;
+    const score2 = winner === 2 ? winScore : loseScore;
+    
+    data.matches = data.matches.map(match => {
+      if (match.id === m.id) {
+        return { ...match, score1, score2, completed: true, timestamp: Date.now() };
+      }
+      return match;
+    });
+  });
+  
+  saveData();
+  alert(`已为 ${currentMatches.length} 场比赛随机生成分数！`);
+  renderScore();
 }

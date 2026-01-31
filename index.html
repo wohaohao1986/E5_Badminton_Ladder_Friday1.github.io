@@ -58,6 +58,7 @@
     <div id="page-score" class="hidden">
       <h1>报分</h1>
       <div class="card">
+        <button onclick="autoFillScores()" class="btn-danger" style="margin-bottom:15px;width:100%;">临时功能：随机报分（测试用）</button>
         <form onsubmit="submitScore(event)">
           <div class="mb-15">
             <label style="display: block; margin-bottom: 5px; font-weight: bold;">选择比赛</label>
@@ -101,9 +102,11 @@
       <div class="card">
         <h2>核心规则</h2>
         <ul style="line-height:1.8;">
-          <li>所有选手按排名顺序分组（前4人第1组，5-8人第2组...）</li>
-          <li>支持4人、5人、6人小组</li>
+          <li>所有选手按排名顺序分组</li>
+          <li>优先分成4人组和5人组，只在6人和11人时使用6人组</li>
+          <li>不支持3人以下和7人组（需调整人数）</li>
           <li>每人与组内其他所有人各搭档一次</li>
+          <li>6人组特殊规则：头两名需要搭档两次，其中一次对战最后两名的搭档</li>
           <li>比赛计分：21分制，组内只按净胜分排名</li>
         </ul>
       </div>
@@ -134,20 +137,6 @@
       <h1>管理面板</h1>
       
       <div class="card">
-        <h2>添加选手</h2>
-        <div class="flex">
-          <input type="text" id="new-player-name" placeholder="输入选手姓名" style="flex: 1;">
-          <button onclick="addPlayer()" class="btn-primary">添加</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>排名管理 (<span id="player-count">0</span>人，<span id="active-count">0</span>人参赛）</h2>
-        <button onclick="editPlayerRanking()" class="btn-warning" style="margin-bottom:15px;">修改选手排名</button>
-        <div id="player-ranking-list"></div>
-      </div>
-
-      <div class="card">
         <h2>分组管理</h2>
         <div class="flex" style="flex-wrap: wrap;">
           <button onclick="generateWeeklyGroups()" id="btn-generate" class="btn-secondary">生成本轮分组</button>
@@ -161,6 +150,25 @@
           <button onclick="saveGroupEdits()" class="btn-primary" style="margin-top:15px;">保存分组</button>
           <button onclick="toggleEditGroups()" class="btn-secondary" style="margin-top:15px;margin-left:10px;">取消</button>
         </div>
+      </div>
+
+      <div class="card">
+        <h2>添加选手</h2>
+        <div class="flex">
+          <select id="new-player-category" style="width:120px;">
+            <option value="male">男双</option>
+            <option value="female">女双</option>
+            <option value="fun">娱乐</option>
+          </select>
+          <input type="text" id="new-player-name" placeholder="输入选手姓名" style="flex: 1;">
+          <button onclick="addPlayer()" class="btn-primary">添加</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>排名管理 (<span id="player-count">0</span>人，<span id="active-count">0</span>人参赛）</h2>
+        <button onclick="editPlayerRanking()" class="btn-warning" style="margin-bottom:15px;">修改选手排名</button>
+        <div id="player-ranking-list"></div>
       </div>
 
       <div class="card">
