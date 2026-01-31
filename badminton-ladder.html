@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>羽毛球 Ladder League</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; }
+    .nav { background: #4CAF50; color: white; padding: 15px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .nav button { background: white; color: #4CAF50; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .nav button.active { background: #45a049; color: white; }
+    .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+    .card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    h1 { color: #4CAF50; margin-bottom: 20px; }
+    h2 { margin-bottom: 15px; font-size: 20px; }
+    h3 { margin-bottom: 10px; font-size: 16px; }
+    input, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; width: 100%; }
+    button { cursor: pointer; border: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #4CAF50; color: white; }
+    .btn-secondary { background: #2196F3; color: white; }
+    .btn-warning { background: #FF9800; color: white; }
+    .btn-danger { background: #f44336; color: white; }
+    .btn-info { background: #9C27B0; color: white; }
+    .flex { display: flex; gap: 10px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #f5f5f5; font-weight: bold; }
+    .match-item { padding: 10px; border-radius: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .match-pending { background: #fff3e0; }
+    .match-completed { background: #e8f5e9; }
+    .player-item { padding: 10px; background: #f5f5f5; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .player-inactive { opacity: 0.6; background: #e0e0e0; }
+    .hidden { display: none; }
+    .mb-15 { margin-bottom: 15px; }
+    .mt-20 { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <button onclick="showPage('home')" id="nav-home" class="active">首页</button>
+    <button onclick="showPage('score')" id="nav-score">报分</button>
+    <button onclick="showPage('ranking')" id="nav-ranking">总排名</button>
+    <button onclick="showPage('history')" id="nav-history">历史记录</button>
+    <button onclick="showPage('rules')" id="nav-rules">规则说明</button>
+    <button onclick="showPage('admin')" id="nav-admin">管理</button>
+  </div>
+
+  <div class="container">
+    <div id="page-home">
+      <h1>羽毛球 Ladder League - 第 <span id="home-round">1</span> 轮</h1>
+      <div id="home-groups"></div>
+    </div>
+
+    <div id="page-score" class="hidden">
+      <h1>报分</h1>
+      <div class="card">
+        <form onsubmit="submitScore(event)">
+          <div class="mb-15">
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">选择比赛</label>
+            <select id="score-match" onchange="updateScoreForm()">
+              <option value="">-- 请选择 --</option>
+            </select>
+          </div>
+          <div id="score-inputs" class="hidden">
+            <div class="mb-15">
+              <label style="display: block; margin-bottom: 5px; font-weight: bold;" id="team1-label">队伍1</label>
+              <input type="number" id="score1" min="0" placeholder="输入分数">
+            </div>
+            <div class="mb-15">
+              <label style="display: block; margin-bottom: 5px; font-weight: bold;" id="team2-label">队伍2</label>
+              <input type="number" id="score2" min="0" placeholder="输入分数">
+            </div>
+            <button type="submit" class="btn-primary" style="width: 100%; padding: 12px; font-size: 16px;">提交比分</button>
+          </div>
+        </form>
+      </div>
+      <div class="mt-20">
+        <h2>已完成比赛</h2>
+        <div id="completed-matches"></div>
+      </div>
+    </div>
+
+    <div id="page-ranking" class="hidden">
+      <h1>总排名（所有历史数据）</h1>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>排名</th>
+              <th>选手</th>
+              <th style="text-align:center;">总胜场</th>
+              <th style="text-align:center;">总净胜分</th>
+              <th style="text-align:center;">状态</th>
+            </tr>
+          </thead>
+          <tbody id="ranking-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="page-history" class="hidden">
+      <h1>历史记录</h1>
+      <div id="history-content"></div>
+    </div>
+
+    <div id="page-rules" class="hidden">
+      <h1>规则说明</h1>
+      <div class="card">
+        <h2>基本规则</h2>
+        <ul style="line-height:1.8;">
+          <li>每轮比赛按历史总成绩（胜场+净胜分）排名分组</li>
+          <li>支持4人、5人、6人小组，优先分成4人组</li>
+          <li>每人与组内其他所有人各搭档一次</li>
+          <li>比赛计分：21分制，按胜场和净胜分排名</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>4人组规则</h2>
+        <ul style="line-height:1.8;">
+          <li>总共3场比赛，每人打3场</li>
+          <li>每人与其他3人各搭档一次</li>
+          <li>第1名升级，第4名降级（首末组除外）</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>5人组规则</h2>
+        <ul style="line-height:1.8;">
+          <li>总共5场比赛，每人打4场</li>
+          <li>每场有4人比赛，1人轮空</li>
+          <li>每人与其他4人各搭档一次，轮空一次</li>
+          <li>第1名升级，第5名降级（首末组除外）</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>6人组规则</h2>
+        <ul style="line-height:1.8;">
+          <li>总共8场比赛，前2名打6场，其他4人打5场</li>
+          <li>每人与其他5人各搭档一次</li>
+          <li><strong>特殊规则：</strong>最后两名为“孤儿组合”，最后一场才搭档</li>
+          <li>前两名需要迎战孤儿组合，因此多打1场</li>
+          <li>第1名升级，第6名降级（首末组除外）</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>分组规则</h2>
+        <ul style="line-height:1.8;">
+          <li>点击“生成本轮分组”可在上轮结束后、本轮开始前任意次数重新分组</li>
+          <li>一旦任何一场比赛报分后，不可重新分组</li>
+          <li>直到所有比赛完成并点击“本轮结束（升降级）”后，才能开始下一轮</li>
+          <li>新加入的选手默认进入最低组</li>
+          <li>退出的选手可点击“停用”，不删除历史数据</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>注意事项</h2>
+        <ul style="line-height:1.8;">
+          <li>所有人均可报分和修改比分</li>
+          <li>只有管理员可以删除选手、清空数据</li>
+          <li>建议定期导出数据备份</li>
+          <li>数据存储在浏览器本地，清除浏览器数据会丢失</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="page-admin" class="hidden">
+      <h1>管理面板</h1>
+      
+      <div class="card">
+        <h2>添加选手</h2>
+        <div class="flex">
+          <input type="text" id="new-player-name" placeholder="输入选手姓名" style="flex: 1;">
+          <button onclick="addPlayer()" class="btn-primary">添加</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>选手列表 (<span id="player-count">0</span>人，<span id="active-count">0</span>人参赛）</h2>
+        <div id="player-list" class="grid"></div>
+      </div>
+
+      <div class="card">
+        <h2>分组管理</h2>
+        <p style="color:#666;margin-bottom:10px;font-size:13px;">支持4人组、5人组、6人组，7人及以上需调整人数</p>
+        <div class="flex" style="flex-wrap: wrap;">
+          <button onclick="generateWeeklyGroups()" id="btn-generate" class="btn-secondary">生成本轮分组</button>
+          <button onclick="finishRound()" class="btn-warning">本轮结束（升降级）</button>
+        </div>
+        <div id="current-groups" class="mt-20"></div>
+      </div>
+
+      <div class="card">
+        <h2>统计信息</h2>
+        <p>当前轮次：第 <span id="stat-round">1</span> 轮</p>
+        <p>总选手数：<span id="stat-players">0</span> 人</p>
+        <p>本轮参赛：<span id="stat-active">0</span> 人</p>
+        <p>分组数：<span id="stat-groups">0</span> 组</p>
+        <p>本轮比赛：<span id="stat-matches">0</span> 场</p>
+        <p>已完成：<span id="stat-completed">0</span> 场</p>
+        <div class="mt-20">
+          <button onclick="exportData()" class="btn-secondary">导出数据备份</button>
+          <button onclick="importData()" class="btn-info" style="margin-left:10px;">导入数据</button>
+          <button onclick="changePassword()" class="btn-warning" style="margin-left:10px;">修改管理员密码</button>
+          <button onclick="resetAllData()" class="btn-danger" style="margin-left:10px;">清空所有数据</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
