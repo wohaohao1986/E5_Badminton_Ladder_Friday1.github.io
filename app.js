@@ -5,7 +5,8 @@ let data = {
   matches: [], 
   currentRound: 1, 
   adminPassword: 'e52026',
-  rankingModified: false
+  rankingModified: false,
+  roundHistory: []
 };
 
 function init() {
@@ -15,6 +16,7 @@ function init() {
   }
   if (!data.adminPassword) data.adminPassword = 'e52026';
   if (data.rankingModified === undefined) data.rankingModified = false;
+  if (!data.roundHistory) data.roundHistory = [];
   
   data.players.forEach(p => {
     if (p.active === undefined) p.active = true;
@@ -280,6 +282,29 @@ function renderHistory() {
     if (roundMatches.length === 0) continue;
 
     html += `<div class="card"><h2>第 ${r} 轮</h2>`;
+    
+    const roundHistory = data.roundHistory.find(rh => rh.round === r);
+    if (roundHistory) {
+      html += '<h3 style="margin-top:15px;">本轮排名与升降级</h3>';
+      html += '<table style="margin-bottom:15px;"><thead><tr><th>排名</th><th>选手</th><th style="text-align:center;">组别</th><th style="text-align:center;">净胜分</th><th style="text-align:center;">升降级</th></tr></thead><tbody>';
+      roundHistory.rankings.forEach((item, index) => {
+        let changeIcon = '';
+        if (item.change === 'promoted') changeIcon = '<span style="color:#4CAF50;">↑ 升级</span>';
+        else if (item.change === 'relegated') changeIcon = '<span style="color:#f44336;">↓ 降级</span>';
+        else changeIcon = '<span style="color:#999;">-</span>';
+        
+        html += `<tr>
+          <td>${index + 1}</td>
+          <td>${item.name}</td>
+          <td style="text-align:center;">第${item.group}组</td>
+          <td style="text-align:center;">${item.netScore > 0 ? '+' : ''}${item.netScore}</td>
+          <td style="text-align:center;">${changeIcon}</td>
+        </tr>`;
+      });
+      html += '</tbody></table>';
+    }
+    
+    html += '<h3>比赛结果</h3>';
     roundMatches.forEach(m => {
       const time = m.timestamp ? new Date(m.timestamp).toLocaleString('zh-CN') : '';
       html += `<div class="match-item match-completed">
@@ -667,6 +692,27 @@ function finishRound() {
 
   const sorted = groupRankings.sort((a, b) => a.level - b.level);
   
+  const roundRankings = [];
+  sorted.forEach(group => {
+    group.rankings.forEach((r, idx) => {
+      const player = data.players.find(p => p.id === r.id);
+      let change = 'none';
+      if (group.level > 1 && idx === 0) change = 'promoted';
+      if (group.level < sorted.length && idx === group.rankings.length - 1) change = 'relegated';
+      roundRankings.push({
+        name: player.name,
+        group: group.level,
+        netScore: r.netScore,
+        change: change
+      });
+    });
+  });
+  
+  data.roundHistory.push({
+    round: data.currentRound,
+    rankings: roundRankings
+  });
+  
   const newRanking = [];
   
   for (let i = 0; i < sorted.length; i++) {
@@ -817,7 +863,7 @@ function resetAllData() {
   }
 
   localStorage.removeItem('badminton_ladder_v2');
-  data = { players: [], groups: [], matches: [], currentRound: 1, adminPassword: 'e52026', rankingModified: false };
+  data = { players: [], groups: [], matches: [], currentRound: 1, adminPassword: 'e52026', rankingModified: false, roundHistory: [] };
   alert('数据已清空');
   location.reload();
 }
