@@ -68,6 +68,11 @@ function getPlayerName(id) {
   return player ? player.name : '未知';
 }
 
+function hasAnyMatchStarted() {
+  const currentMatches = data.matches.filter(m => m.round === data.currentRound);
+  return currentMatches.some(m => m.completed);
+}
+
 function calculatePlayerStats(playerId, matches) {
   let wins = 0, netScore = 0;
   matches.forEach(m => {
@@ -419,8 +424,7 @@ function renderAdmin() {
   }
 
   const currentMatches = data.matches.filter(m => m.round === data.currentRound);
-  const hasStarted = currentMatches.some(m => m.completed);
-  document.getElementById('btn-generate').disabled = hasStarted;
+  document.getElementById('btn-generate').disabled = hasAnyMatchStarted();
 
   document.getElementById('stat-round').textContent = data.currentRound;
   document.getElementById('stat-players').textContent = data.players.length;
@@ -431,6 +435,11 @@ function renderAdmin() {
 }
 
 function changePlayerCategory(id) {
+  if (hasAnyMatchStarted()) {
+    alert('比赛已开始，无法修改选手类别');
+    return;
+  }
+  
   const player = data.players.find(p => p.id === id);
   if (!player) return;
   
@@ -471,10 +480,7 @@ function changePlayerCategory(id) {
 }
 
 function checkCategoriesAfterChange(oldCat, newCat) {
-  const currentMatches = data.matches.filter(m => m.round === data.currentRound);
-  const hasStarted = currentMatches.some(m => m.completed);
-  
-  if (hasStarted) {
+  if (hasAnyMatchStarted()) {
     alert('比赛已开始，无法调整分组');
     return;
   }
@@ -519,6 +525,11 @@ function removeMatchesOnly(category) {
 }
 
 function addPlayer() {
+  if (hasAnyMatchStarted()) {
+    alert('比赛已开始，无法添加选手');
+    return;
+  }
+  
   const category = document.getElementById('new-player-category').value;
   const name = document.getElementById('new-player-name').value.trim();
   if (!name) {
@@ -546,6 +557,11 @@ function addPlayer() {
 }
 
 function deletePlayer(id) {
+  if (hasAnyMatchStarted()) {
+    alert('比赛已开始，无法删除选手');
+    return;
+  }
+  
   const password = prompt('删除选手需要管理员密码：');
   if (password !== data.adminPassword) {
     alert('密码错误！');
@@ -563,6 +579,11 @@ function deletePlayer(id) {
 }
 
 function togglePlayerActive(id) {
+  if (hasAnyMatchStarted()) {
+    alert('比赛已开始，无法启用/停用选手');
+    return;
+  }
+  
   const player = data.players.find(p => p.id === id);
   if (!player) return;
   
@@ -600,10 +621,7 @@ function checkAndPromptRegroup(category, action) {
 }
 
 function handleDeactivation(playerId, category) {
-  const currentMatches = data.matches.filter(m => m.round === data.currentRound);
-  const hasStarted = currentMatches.some(m => m.completed);
-  
-  if (hasStarted || data.groups.length === 0) return;
+  if (hasAnyMatchStarted() || data.groups.length === 0) return;
   
   const group = data.groups.find(g => g.playerIds.includes(playerId));
   if (!group) return;
@@ -627,6 +645,11 @@ function handleDeactivation(playerId, category) {
 }
 
 function editPlayerRanking() {
+  if (hasAnyMatchStarted()) {
+    alert('比赛已开始，无法修改排名');
+    return;
+  }
+  
   const password = prompt('修改排名需要管理员密码：');
   if (password !== data.adminPassword) {
     alert('密码错误！');
@@ -766,6 +789,11 @@ function editPlayerRanking() {
 let editGroupsPasswordVerified = false;
 
 function toggleEditGroups() {
+  if (hasAnyMatchStarted()) {
+    alert('比赛已开始，无法手动调整分组');
+    return;
+  }
+  
   const panel = document.getElementById('edit-groups-panel');
   const isHidden = panel.classList.contains('hidden');
   
@@ -870,6 +898,11 @@ function saveGroupEdits() {
 
 
 function generateWeeklyGroups() {
+  if (hasAnyMatchStarted()) {
+    alert('比赛已开始，无法重新生成分组');
+    return;
+  }
+  
   if (!data.rankingModified && data.groups.length > 0) {
     alert('排名未修改且已有分组，无需重新生成。\n如需重新分组，请先修改排名或调整人员。');
     return;
