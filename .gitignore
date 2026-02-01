@@ -1,0 +1,16 @@
+### Node / npm
+node_modules/
+npm-debug.log*
+package-lock.json
+.npmrc
+
+### Optional build/output
+dist/
+build/
+
+### Environment
+.env
+
+### OS / Editor
+.DS_Store
+.vscode/
