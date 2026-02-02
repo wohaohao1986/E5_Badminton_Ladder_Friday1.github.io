@@ -26,7 +26,7 @@ const SERVER_BASE = (function(){
   return 'http://localhost:3000';
 })();
 
-function sendToServer(path, payload) {
+function addDataToServer(path, payload) {
   const url = `${SERVER_BASE}${path}`;
   return fetch(url, {
     method: 'POST',
@@ -37,6 +37,34 @@ function sendToServer(path, payload) {
     return res.json().catch(() => ({}));
   }).catch(err => {
     console.warn('sendToServer error:', err);
+  });
+}
+
+function updateDataToServer(path, payload) {
+  const url = `${SERVER_BASE}${path}`;
+  return fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(res => {
+    if (!res.ok) throw new Error(`Server responded ${res.status}`);
+    return res.json().catch(() => ({}));
+  }).catch(err => {
+    console.warn('updateDataToServer error:', err);
+  });
+}
+
+
+function getFromServer(path) {
+  const url = `${SERVER_BASE}${path}`;
+  return fetch(url, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' }
+  }).then(res => {
+    if (!res.ok) throw new Error(`Server responded ${res.status}`);
+    return res.json();
+  }).catch(err => {
+    console.warn('getFromServer error:', err);
   });
 }
 
@@ -57,35 +85,8 @@ function deleteFromServer(path, payload) {
   }
 }
 
-async function getDataFromServer() {
-  try {
-    const res = await fetch(`${SERVER_BASE}/data/badminton_ladder_v2.json`);
-    if (res.ok) {
-      const serverData = await res.json();
-      data = serverData;
-    }
-  } catch (e) {
-    // network error / server not running -> use localStorage
-    const stored = localStorage.getItem('badminton_ladder_v2');
-    if (stored) data = JSON.parse(stored);
-  }
-}
-
-function init() {
-  // Try to load authoritative player data from server first (falls back to localStorage)
-  getDataFromServer();
-  if (!data.adminPassword) data.adminPassword = 'e52026';
-  if (data.rankingModified === undefined) data.rankingModified = false;
-  if (!data.roundHistory) data.roundHistory = [];
-  
-  data.players.forEach(p => {
-    if (p.active === undefined) p.active = true;
-    if (p.ranking === undefined) p.ranking = 999;
-    if (!p.category) p.category = 'fun';
-  });
-  
-  sortPlayersByRanking();
-  showPage('home');
+async function syncDataFromServer() {
+  data = await getFromServer('/api/main');
 }
 
 async function saveData(path, payload) {
@@ -99,22 +100,28 @@ async function saveData(path, payload) {
   // if a server path is provided, send payload then refresh authoritative data
   if (path) {
     try {
-      await sendToServer(path, payload);
-      await getDataFromServer();
+      await addDataToServer(path, payload);
+      await getFromServer('api/main');
     } catch (e) {
       console.warn('saveData: server sync failed', e);
     }
   }
 }
 
-function sortPlayersByRanking() {
-  Object.keys(CATEGORIES).forEach(cat => {
-    const catPlayers = data.players.filter(p => p.category === cat);
-    catPlayers.sort((a, b) => a.ranking - b.ranking);
-    catPlayers.forEach((p, index) => {
-      p.ranking = index + 1;
-    });
+async function init() {
+  // Try to load authoritative player data from server first (falls back to localStorage)
+  syncDataFromServer();
+  if (!data.adminPassword) data.adminPassword = 'e52026';
+  if (data.rankingModified === undefined) data.rankingModified = false;
+  if (!data.roundHistory) data.roundHistory = [];
+  
+  data.players.forEach(p => {
+    if (p.active === undefined) p.active = true;
+    if (p.ranking === undefined) p.ranking = 999;
+    if (!p.category) p.category = 'fun';
   });
+  
+  showPage('home');
 }
 
 function showPage(page) {
@@ -131,68 +138,6 @@ function showPage(page) {
   if (page === 'history') renderHistory();
   if (page === 'admin') renderAdmin();
 }
-
-function getPlayerName(id) {
-  const player = data.players.find(p => p.id === id);
-  return player ? player.name : '未知';
-}
-
-function hasAnyMatchStarted() {
-  const currentMatches = data.matches.filter(m => m.round === data.currentRound);
-  return currentMatches.some(m => m.completed);
-}
-
-function calculatePlayerStats(playerId, matches) {
-  let wins = 0, netScore = 0;
-  matches.forEach(m => {
-    if (!m.completed) return;
-    const inTeam1 = m.team1.includes(playerId);
-    const inTeam2 = m.team2.includes(playerId);
-    if (inTeam1) {
-      if (m.score1 > m.score2) wins++;
-      netScore += (m.score1 - m.score2);
-    } else if (inTeam2) {
-      if (m.score2 > m.score1) wins++;
-      netScore += (m.score2 - m.score1);
-    }
-  });
-  return { wins, netScore };
-}
-
-function generateMatches(groupId, playerIds, round) {
-  if (playerIds.length === 4) {
-    const [p1, p2, p3, p4] = playerIds;
-    return [
-      { id: `${round}-${groupId}-1`, round, groupId, team1: [p1, p2], team2: [p3, p4], score1: null, score2: null, completed: false, timestamp: null },
-      { id: `${round}-${groupId}-2`, round, groupId, team1: [p1, p3], team2: [p2, p4], score1: null, score2: null, completed: false, timestamp: null },
-      { id: `${round}-${groupId}-3`, round, groupId, team1: [p1, p4], team2: [p2, p3], score1: null, score2: null, completed: false, timestamp: null }
-    ];
-  } else if (playerIds.length === 5) {
-    const [p1, p2, p3, p4, p5] = playerIds;
-    return [
-      { id: `${round}-${groupId}-1`, round, groupId, team1: [p1, p2], team2: [p3, p4], score1: null, score2: null, completed: false, timestamp: null },
-      { id: `${round}-${groupId}-2`, round, groupId, team1: [p1, p3], team2: [p2, p5], score1: null, score2: null, completed: false, timestamp: null },
-      { id: `${round}-${groupId}-3`, round, groupId, team1: [p1, p4], team2: [p3, p5], score1: null, score2: null, completed: false, timestamp: null },
-      { id: `${round}-${groupId}-4`, round, groupId, team1: [p1, p5], team2: [p2, p4], score1: null, score2: null, completed: false, timestamp: null },
-      { id: `${round}-${groupId}-5`, round, groupId, team1: [p2, p3], team2: [p4, p5], score1: null, score2: null, completed: false, timestamp: null }
-    ];
-  } else if (playerIds.length === 6) {
-    const [p1, p2, p3, p4, p5, p6] = playerIds;
-    return [
-      { id: `${round}-${groupId}-1`, round, groupId, team1: [p1, p2], team2: [p3, p4], score1: null, score2: null, completed: false, timestamp: null },
-      { id: `${round}-${groupId}-2`, round, groupId, team1: [p1, p3], team2: [p4, p5], score1: null, score2: null, completed: false, timestamp: null },
-      { id: `${round}-${groupId}-3`, round, groupId, team1: [p1, p4], team2: [p2, p6], score1: null, score2: null, completed: false, timestamp: null },
-      { id: `${round}-${groupId}-4`, round, groupId, team1: [p1, p5], team2: [p2, p3], score1: null, score2: null, completed: false, timestamp: null },
-      { id: `${round}-${groupId}-5`, round, groupId, team1: [p1, p6], team2: [p2, p4], score1: null, score2: null, completed: false, timestamp: null },
-      { id: `${round}-${groupId}-6`, round, groupId, team1: [p2, p5], team2: [p3, p6], score1: null, score2: null, completed: false, timestamp: null },
-      { id: `${round}-${groupId}-7`, round, groupId, team1: [p3, p5], team2: [p4, p6], score1: null, score2: null, completed: false, timestamp: null },
-      { id: `${round}-${groupId}-8`, round, groupId, team1: [p5, p6], team2: [p1, p2], score1: null, score2: null, completed: false, timestamp: null }
-    ];
-  }
-  return [];
-}
-
-init();
 
 function renderHome() {
   document.getElementById('home-round').textContent = data.currentRound;
@@ -287,78 +232,6 @@ function renderScore() {
     </div>`;
   });
   document.getElementById('completed-matches').innerHTML = html || '<p>暂无已完成比赛</p>';
-}
-
-function updateScoreForm() {
-  const matchId = document.getElementById('score-match').value;
-  const inputs = document.getElementById('score-inputs');
-  
-  if (!matchId) {
-    inputs.classList.add('hidden');
-    return;
-  }
-
-  const match = data.matches.find(m => m.id === matchId);
-  document.getElementById('team1-label').textContent = match.team1.map(getPlayerName).join(' / ') + ' 得分';
-  document.getElementById('team2-label').textContent = match.team2.map(getPlayerName).join(' / ') + ' 得分';
-  inputs.classList.remove('hidden');
-}
-
-function submitScore(e) {
-  e.preventDefault();
-  const matchId = document.getElementById('score-match').value;
-  const score1 = parseInt(document.getElementById('score1').value);
-  const score2 = parseInt(document.getElementById('score2').value);
-
-  if (!matchId || isNaN(score1) || isNaN(score2)) {
-    alert('请填写完整信息');
-    return;
-  }
-
-  data.matches = data.matches.map(m => {
-    if (m.id === matchId) {
-      return { ...m, score1, score2, completed: true, timestamp: Date.now() };
-    }
-    return m;
-  });
-
-  saveData();
-  document.getElementById('score-match').value = '';
-  document.getElementById('score1').value = '';
-  document.getElementById('score2').value = '';
-  document.getElementById('score-inputs').classList.add('hidden');
-  alert('比分已记录！');
-  renderScore();
-}
-
-function editScore(matchId) {
-  const match = data.matches.find(m => m.id === matchId);
-  if (!match) return;
-
-  const newScore1 = prompt(`请输入 ${match.team1.map(getPlayerName).join('/')} 的得分：`, match.score1);
-  if (newScore1 === null) return;
-
-  const newScore2 = prompt(`请输入 ${match.team2.map(getPlayerName).join('/')} 的得分：`, match.score2);
-  if (newScore2 === null) return;
-
-  const s1 = parseInt(newScore1);
-  const s2 = parseInt(newScore2);
-
-  if (isNaN(s1) || isNaN(s2) || s1 < 0 || s2 < 0) {
-    alert('请输入有效分数');
-    return;
-  }
-
-  data.matches = data.matches.map(m => {
-    if (m.id === matchId) {
-      return { ...m, score1: s1, score2: s2, timestamp: Date.now() };
-    }
-    return m;
-  });
-
-  saveData();
-  alert('比分已修改！');
-  renderScore();
 }
 
 function renderRanking() {
@@ -503,7 +376,171 @@ function renderAdmin() {
   document.getElementById('stat-completed').textContent = currentMatches.filter(m => m.completed).length;
 }
 
-function changePlayerCategory(id) {
+function renderGroupEditor() {
+  const container = document.getElementById('edit-groups-content');
+  let html = '';
+  
+  data.groups.forEach((group, gIndex) => {
+    html += `<div style="margin-bottom:20px;padding:15px;background:#f9f9f9;border-radius:6px;">
+      <h4>第 ${group.level} 组</h4>`;
+    
+    group.playerIds.forEach((playerId, pIndex) => {
+      const playerName = getPlayerName(playerId);
+      html += `<div style="display:flex;align-items:center;gap:10px;margin:10px 0;">
+        <span style="flex:1;">${playerName}</span>
+        <select onchange="movePlayerToGroup('${playerId}', ${gIndex}, this.value)" style="width:150px;">
+          <option value="">移动到...</option>`;
+      
+      data.groups.forEach((g, idx) => {
+        if (idx !== gIndex) {
+          html += `<option value="${idx}">第 ${g.level} 组</option>`;
+        }
+      });
+      
+      html += `</select>
+      </div>`;
+    });
+    
+    html += `</div>`;
+  });
+  
+  container.innerHTML = html;
+}
+
+// helper to get player name by ID 
+function getPlayerName(id) {
+  const player = data.players.find(p => p.id === id);
+  return player ? player.name : '未知';
+}
+
+function hasAnyMatchStarted() {
+  const currentMatches = data.matches.filter(m => m.round === data.currentRound);
+  return currentMatches.some(m => m.completed);
+}
+
+function calculatePlayerStats(playerId, matches) {
+  let wins = 0, netScore = 0;
+  matches.forEach(m => {
+    if (!m.completed) return;
+    const inTeam1 = m.team1.includes(playerId);
+    const inTeam2 = m.team2.includes(playerId);
+    if (inTeam1) {
+      if (m.score1 > m.score2) wins++;
+      netScore += (m.score1 - m.score2);
+    } else if (inTeam2) {
+      if (m.score2 > m.score1) wins++;
+      netScore += (m.score2 - m.score1);
+    }
+  });
+  return { wins, netScore };
+}
+
+function generateMatches(groupId, playerIds, round) {
+  if (playerIds.length === 4) {
+    const [p1, p2, p3, p4] = playerIds;
+    return [
+      { id: `${round}-${groupId}-1`, round, groupId, team1: [p1, p2], team2: [p3, p4], score1: null, score2: null, completed: false, timestamp: null },
+      { id: `${round}-${groupId}-2`, round, groupId, team1: [p1, p3], team2: [p2, p4], score1: null, score2: null, completed: false, timestamp: null },
+      { id: `${round}-${groupId}-3`, round, groupId, team1: [p1, p4], team2: [p2, p3], score1: null, score2: null, completed: false, timestamp: null }
+    ];
+  } else if (playerIds.length === 5) {
+    const [p1, p2, p3, p4, p5] = playerIds;
+    return [
+      { id: `${round}-${groupId}-1`, round, groupId, team1: [p1, p2], team2: [p3, p4], score1: null, score2: null, completed: false, timestamp: null },
+      { id: `${round}-${groupId}-2`, round, groupId, team1: [p1, p3], team2: [p2, p5], score1: null, score2: null, completed: false, timestamp: null },
+      { id: `${round}-${groupId}-3`, round, groupId, team1: [p1, p4], team2: [p3, p5], score1: null, score2: null, completed: false, timestamp: null },
+      { id: `${round}-${groupId}-4`, round, groupId, team1: [p1, p5], team2: [p2, p4], score1: null, score2: null, completed: false, timestamp: null },
+      { id: `${round}-${groupId}-5`, round, groupId, team1: [p2, p3], team2: [p4, p5], score1: null, score2: null, completed: false, timestamp: null }
+    ];
+  } else if (playerIds.length === 6) {
+    const [p1, p2, p3, p4, p5, p6] = playerIds;
+    return [
+      { id: `${round}-${groupId}-1`, round, groupId, team1: [p1, p2], team2: [p3, p4], score1: null, score2: null, completed: false, timestamp: null },
+      { id: `${round}-${groupId}-2`, round, groupId, team1: [p1, p3], team2: [p4, p5], score1: null, score2: null, completed: false, timestamp: null },
+      { id: `${round}-${groupId}-3`, round, groupId, team1: [p1, p4], team2: [p2, p6], score1: null, score2: null, completed: false, timestamp: null },
+      { id: `${round}-${groupId}-4`, round, groupId, team1: [p1, p5], team2: [p2, p3], score1: null, score2: null, completed: false, timestamp: null },
+      { id: `${round}-${groupId}-5`, round, groupId, team1: [p1, p6], team2: [p2, p4], score1: null, score2: null, completed: false, timestamp: null },
+      { id: `${round}-${groupId}-6`, round, groupId, team1: [p2, p5], team2: [p3, p6], score1: null, score2: null, completed: false, timestamp: null },
+      { id: `${round}-${groupId}-7`, round, groupId, team1: [p3, p5], team2: [p4, p6], score1: null, score2: null, completed: false, timestamp: null },
+      { id: `${round}-${groupId}-8`, round, groupId, team1: [p5, p6], team2: [p1, p2], score1: null, score2: null, completed: false, timestamp: null }
+    ];
+  }
+  return [];
+}
+
+function updateScoreForm() {
+  const matchId = document.getElementById('score-match').value;
+  const inputs = document.getElementById('score-inputs');
+  
+  if (!matchId) {
+    inputs.classList.add('hidden');
+    return;
+  }
+
+  const match = data.matches.find(m => m.id === matchId);
+  document.getElementById('team1-label').textContent = match.team1.map(getPlayerName).join(' / ') + ' 得分';
+  document.getElementById('team2-label').textContent = match.team2.map(getPlayerName).join(' / ') + ' 得分';
+  inputs.classList.remove('hidden');
+}
+
+function submitScore(e) {
+  e.preventDefault();
+  const matchId = document.getElementById('score-match').value;
+  const score1 = parseInt(document.getElementById('score1').value);
+  const score2 = parseInt(document.getElementById('score2').value);
+
+  if (!matchId || isNaN(score1) || isNaN(score2)) {
+    alert('请填写完整信息');
+    return;
+  }
+
+  data.matches = data.matches.map(m => {
+    if (m.id === matchId) {
+      return { ...m, score1, score2, completed: true, timestamp: Date.now() };
+    }
+    return m;
+  });
+
+  updateDataToServer('/api/match', { id: matchId, score1, score2, completed: true, timestamp: Date.now() });
+  document.getElementById('score-match').value = '';
+  document.getElementById('score1').value = '';
+  document.getElementById('score2').value = '';
+  document.getElementById('score-inputs').classList.add('hidden');
+  alert('比分已记录！');
+  renderScore();
+}
+
+function editScore(matchId) {
+  const match = data.matches.find(m => m.id === matchId);
+  if (!match) return;
+
+  const newScore1 = prompt(`请输入 ${match.team1.map(getPlayerName).join('/')} 的得分：`, match.score1);
+  if (newScore1 === null) return;
+
+  const newScore2 = prompt(`请输入 ${match.team2.map(getPlayerName).join('/')} 的得分：`, match.score2);
+  if (newScore2 === null) return;
+
+  const s1 = parseInt(newScore1);
+  const s2 = parseInt(newScore2);
+
+  if (isNaN(s1) || isNaN(s2) || s1 < 0 || s2 < 0) {
+    alert('请输入有效分数');
+    return;
+  }
+
+  data.matches = data.matches.map(m => {
+    if (m.id === matchId) {
+      return { ...m, score1: s1, score2: s2, timestamp: Date.now() };
+    }
+    return m;
+  });
+
+  updateDataToServer('/api/match', { id: matchId, score1: s1, score2: s2, timestamp: Date.now() });
+  alert('比分已修改！');
+  renderScore();
+}
+
+async function changePlayerCategory(id) {
   if (hasAnyMatchStarted()) {
     alert('比赛已开始，无法修改选手类别');
     return;
@@ -538,62 +575,20 @@ function changePlayerCategory(id) {
   const newCatPlayers = data.players.filter(p => p.category === selectedCat);
   player.category = selectedCat;
   player.ranking = newCatPlayers.length + 1;
-  data.rankingModified = true;
   
-  saveData();
-  alert(`${player.name} 已改为${CATEGORIES[selectedCat]}，排名第${player.ranking}名`);
-  renderAdmin();
-  renderHome();
-  
-  checkCategoriesAfterChange(oldCat, selectedCat);
-}
-
-function checkCategoriesAfterChange(oldCat, newCat) {
-  if (hasAnyMatchStarted()) {
-    alert('比赛已开始，无法调整分组');
-    return;
-  }
-  
-  const oldCatActive = data.players.filter(p => p.active && p.category === oldCat).length;
-  const newCatActive = data.players.filter(p => p.active && p.category === newCat).length;
-  
-  let needRegroup = false;
-  let message = '类别人数变化：\n';
-  
-  if (oldCatActive === 3 || oldCatActive === 7) {
-    message += `${CATEGORIES[oldCat]}现有${oldCatActive}人，无法分组，请添加/启用或停用选手\n`;
-    removeMatchesOnly(oldCat);
-  }
-  
-  if (newCatActive === 7) {
-    message += `${CATEGORIES[newCat]}现有${newCatActive}人，无法分组，请添加/启用或停用选手\n`;
-    removeMatchesOnly(newCat);
-  }
-  
-  if (oldCatActive === 3 || oldCatActive === 7 || newCatActive === 7) {
-    alert(message);
+  // send update to server and handle any server-side warnings
+  const serverRes = await updateDataToServer('/api/player', player);
+  await syncDataFromServer();
+  if (serverRes && serverRes.status === 'warning') {
+    alert(serverRes.message);
+  } else {
+    alert(`${player.name} 已改为${CATEGORIES[selectedCat]}，排名第${player.ranking}名`);
+    renderAdmin();
     renderHome();
-    renderScore();
-    return;
-  }
-  
-  if (oldCatActive >= 4 || newCatActive >= 4) {
-    message += `\n${CATEGORIES[oldCat]}: ${oldCatActive}人\n${CATEGORIES[newCat]}: ${newCatActive}人\n\n是否重新生成分组？`;
-    if (confirm(message)) {
-      generateWeeklyGroups();
-    }
   }
 }
 
-function removeMatchesOnly(category) {
-  data.matches = data.matches.filter(m => m.round !== data.currentRound || m.category !== category);
-  saveData();
-  renderAdmin();
-  renderHome();
-  renderScore();
-}
-
-function addPlayer() {
+async function addPlayer() {
   if (hasAnyMatchStarted()) {
     alert('比赛已开始，无法添加选手');
     return;
@@ -615,13 +610,14 @@ function addPlayer() {
     ranking: catPlayers.length + 1
   };
   // add locally for immediate UI update, then sync to server
-  data.players.push(newPlayer);
-  saveData('/api/player', newPlayer);
-  data.rankingModified = true;
+  const response = await addDataToServer('/api/player', newPlayer);
+  if (response) {
+    alert(response.message);
+  }
+  await syncDataFromServer();
   document.getElementById('new-player-name').value = '';
   renderAdmin();
 
-  checkAndPromptRegroup(category, 'add');
 }
 
 async function deletePlayer(id) {
@@ -642,8 +638,7 @@ async function deletePlayer(id) {
     const result = await deleteFromServer(`/api/player`, { id });
     if (result) {
       // reload from server to reflect authoritative state
-      await getDataFromServer();
-      data.rankingModified = true;
+      await syncDataFromServer();
       renderAdmin();
       renderHome();
       return;
@@ -656,11 +651,10 @@ async function deletePlayer(id) {
   data.players = data.players.filter(p => p.id !== id);
   data.players.forEach((p, index) => { p.ranking = index + 1; });
   data.rankingModified = true;
-  saveData();
   renderAdmin();
 }
 
-function togglePlayerActive(id) {
+async function togglePlayerActive(id) {
   if (hasAnyMatchStarted()) {
     alert('比赛已开始，无法启用/停用选手');
     return;
@@ -670,59 +664,12 @@ function togglePlayerActive(id) {
   
   player.active = !player.active;
   data.rankingModified = true;
-  saveData();
+  const response = await updateDataToServer('/api/player', player);
+  alert(response.message);
+  await syncDataFromServer();
   renderAdmin();
-  
-  if (player.active) {
-    checkAndPromptRegroup(player.category, 'enable');
-  } else {
-    handleDeactivation(id, player.category);
-  }
-}
-
-function checkAndPromptRegroup(category, action) {
-  const activePlayers = data.players.filter(p => p.active && p.category === category);
-  const total = activePlayers.length;
-  
-  if (total < 4) {
-    alert(`${CATEGORIES[category]}只有${total}人，至少需要4人才能分组`);
-    removeMatchesOnly(category);
-    return;
-  }
-  
-  if (total === 7) {
-    alert(`${CATEGORIES[category]}有7人无法分组\n请再添加/启用一人，或停用一人`);
-    removeMatchesOnly(category);
-    return;
-  }
-  
-  if (confirm(`${CATEGORIES[category]}现有${total}人参赛\n是否重新生成分组？`)) {
-    generateWeeklyGroups();
-  }
-}
-
-function handleDeactivation(playerId, category) {
-  if (hasAnyMatchStarted() || data.groups.length === 0) return;
-  
-  const group = data.groups.find(g => g.playerIds.includes(playerId));
-  if (!group) return;
-  
-  group.playerIds = group.playerIds.filter(id => id !== playerId);
-  const newSize = group.playerIds.length;
-  
-  if (newSize === 3) {
-    alert(`${CATEGORIES[category]}第${group.level}组只剩3人\n请添加/启用一人，或重新分组`);
-    removeMatchesOnly(category);
-  } else if (newSize >= 4 && newSize <= 6) {
-    const newMatches = generateMatches(group.id, group.playerIds, data.currentRound).map(m => ({...m, category: group.category}));
-    data.matches = data.matches.filter(m => m.groupId !== group.id || m.round !== data.currentRound);
-    data.matches.push(...newMatches);
-    saveData();
-    alert(`${CATEGORIES[category]}第${group.level}组已调整为${newSize}人`);
-    renderAdmin();
-    renderHome();
-    renderScore();
-  }
+  renderHome();
+  renderScore();
 }
 
 function editPlayerRanking() {
@@ -900,37 +847,6 @@ function toggleEditGroups() {
   }
 }
 
-function renderGroupEditor() {
-  const container = document.getElementById('edit-groups-content');
-  let html = '';
-  
-  data.groups.forEach((group, gIndex) => {
-    html += `<div style="margin-bottom:20px;padding:15px;background:#f9f9f9;border-radius:6px;">
-      <h4>第 ${group.level} 组</h4>`;
-    
-    group.playerIds.forEach((playerId, pIndex) => {
-      const playerName = getPlayerName(playerId);
-      html += `<div style="display:flex;align-items:center;gap:10px;margin:10px 0;">
-        <span style="flex:1;">${playerName}</span>
-        <select onchange="movePlayerToGroup('${playerId}', ${gIndex}, this.value)" style="width:150px;">
-          <option value="">移动到...</option>`;
-      
-      data.groups.forEach((g, idx) => {
-        if (idx !== gIndex) {
-          html += `<option value="${idx}">第 ${g.level} 组</option>`;
-        }
-      });
-      
-      html += `</select>
-      </div>`;
-    });
-    
-    html += `</div>`;
-  });
-  
-  container.innerHTML = html;
-}
-
 function movePlayerToGroup(playerId, fromGroupIndex, toGroupIndex) {
   if (toGroupIndex === '') return;
   
@@ -976,9 +892,7 @@ function saveGroupEdits() {
   renderAdmin();
 }
 
-
-
-function generateWeeklyGroups() {
+async function generateWeeklyGroups() {
   if (hasAnyMatchStarted()) {
     alert('比赛已开始，无法重新生成分组');
     return;
@@ -1006,27 +920,23 @@ function generateWeeklyGroups() {
     }
     
     const groupSizes = [];
-    if (total === 4) groupSizes.push(4);
-    else if (total === 5) groupSizes.push(5);
-    else if (total === 6) groupSizes.push(6);
-    else if (total === 8) groupSizes.push(4, 4);
-    else if (total === 9) groupSizes.push(4, 5);
-    else if (total === 10) groupSizes.push(5, 5);
-    else if (total === 11) groupSizes.push(6, 5);
-    else if (total === 12) groupSizes.push(4, 4, 4);
-    else if (total === 13) groupSizes.push(4, 4, 5);
-    else if (total === 14) groupSizes.push(4, 5, 5);
-    else if (total === 15) groupSizes.push(5, 5, 5);
-    else if (total === 16) groupSizes.push(4, 4, 4, 4);
-    else if (total === 17) groupSizes.push(4, 4, 4, 5);
-    else if (total === 18) groupSizes.push(4, 4, 5, 5);
-    else if (total === 19) groupSizes.push(4, 5, 5, 5);
-    else if (total === 20) groupSizes.push(4, 4, 4, 4, 4);
-    else {
-      const numFives = total % 4;
-      const numFours = (total - numFives * 5) / 4;
-      for (let i = 0; i < numFours; i++) groupSizes.push(4);
-      for (let i = 0; i < numFives; i++) groupSizes.push(5);
+    const remainder = total % 4;
+
+    if (remainder === 0) {
+      // total is divisible by 4: use all 4s
+      for (let i = 0; i < total / 4; i++) groupSizes.push(4);
+    } else if (remainder === 1) {
+      // total = 4k + 1: use (k-1) 4s and one 5
+      for (let i = 0; i < (total / 4 | 0) - 1; i++) groupSizes.push(4);
+      groupSizes.push(5);
+    } else if (remainder === 2) {
+      // total = 4k + 2: use (k-1) 4s and two 5s
+      for (let i = 0; i < (total / 4 | 0) - 1; i++) groupSizes.push(4);
+      groupSizes.push(5, 5);
+    } else {
+      // remainder === 3: total = 4k + 3: use k 4s and one 5
+      for (let i = 0; i < total / 4 | 0; i++) groupSizes.push(4);
+      groupSizes.push(5);
     }
 
     let playerIndex = 0;
@@ -1042,8 +952,9 @@ function generateWeeklyGroups() {
   
   data.matches.push(...newMatches);
   data.rankingModified = false;
-  saveData();
+  await addDataToServer('/api/match', newMatches);
   alert(`已生成第 ${data.currentRound} 轮分组，共 ${totalGroups} 个组，${newMatches.length} 场比赛`);
+  await syncDataFromServer();
   renderAdmin();
   renderHome();
 }
@@ -1121,6 +1032,7 @@ function finishRound() {
   const newMatches = [];
   let totalGroups = 0;
   
+  // regenerate groups based on updated rankings
   Object.keys(CATEGORIES).forEach(cat => {
     const activePlayers = data.players.filter(p => p.active && p.category === cat).sort((a, b) => a.ranking - b.ranking);
     const total = activePlayers.length;
@@ -1301,3 +1213,5 @@ function autoFillScores() {
   alert(`已为 ${currentMatches.length} 场比赛随机生成分数！`);
   renderScore();
 }
+
+init();

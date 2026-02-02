@@ -1,6 +1,11 @@
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
+const { safeReadJson } = require('./utils/fileUtils');
+const { DATA_FILE } = require('./utils/fileUtils');
+
+// Import route handlers
+const playerRoutes = require('./routes/playerRoutes');
+const matchRoutes = require('./routes/matchRoutes');
 
 const app = express();
 app.use(express.json());
@@ -15,71 +20,23 @@ app.use((req, res, next) => {
   next();
 });
 
-const DATA_FILE = path.join(__dirname, 'data', 'badminton_ladder_v2.json');
-
-// Safe read helpers (create default if missing)
-function safeReadJson(filePath, defaultValue) {
-  try {
-    if (!fs.existsSync(filePath)) {
-      fs.writeFileSync(filePath, JSON.stringify(defaultValue, null, 2));
-      return defaultValue;
-    }
-    const raw = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(raw || JSON.stringify(defaultValue));
-  } catch (err) {
-    return defaultValue;
-  }
-}
-
-function safeWriteJson(filePath, data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-}
-
-// Existing users endpoints (unchanged behavior, but resilient)
-app.get('/users', (req, res) => {
-  const data = safeReadJson(DATA_FILE, { users: [] });
+// Endpoint to get main data
+app.get('/api/main', (req, res) => {
+  const data = safeReadJson(DATA_FILE, { players: [], groups: [], matches: [], currentRound: 1, adminPassword: 'e52026', rankingModified: false, roundHistory: [] });
+  
+  // Sort players by category and ranking before sending to client
+  const CATEGORIES = { male: '男双', female: '女双', fun: '娱乐' };
+  Object.keys(CATEGORIES).forEach(cat => {
+    const catPlayers = data.players.filter(p => p.category === cat);
+    catPlayers.sort((a, b) => a.ranking - b.ranking);
+  });
+  
   res.json(data);
 });
 
-// New endpoint for local player data
-app.post('/api/player', (req, res) => {
-  const payload = req.body;
-  if (!payload || Object.keys(payload).length === 0) {
-    return res.status(400).json({ error: 'Empty payload' });
-  }
-
-  const playersStore = safeReadJson(DATA_FILE, { players: [] });
-  const newP = payload;
-  const exists = playersStore.players.find(p => p.id === newP.id || p.name === newP.name);
-  if (!exists) {
-    playersStore.players.push(newP);
-    safeWriteJson(DATA_FILE, playersStore);
-    console.log('Added new player:', newP);
-    res.status(201).json({ message: 'Player data saved', entry: newP });
-  }
-  else {
-    console.log('Player already exists, not adding:', newP);
-    res.status(409).json({ error: 'Player already exists' });
-  }
-});
-
-// Delete player endpoint
-app.delete('/api/player', (req, res) => {
-  const playerId = req.body.id;
-  console.log('Received delete request for playerId:', playerId);
-  if (!playerId || Object.keys(playerId).length === 0) {
-    return res.status(400).json({ error: 'Empty playerId' });
-  }
-  const playersStore = safeReadJson(DATA_FILE, { players: [] });
-  const filteredPlayers = playersStore.players.filter(p => p.id !== playerId);
-  if (filteredPlayers.length === playersStore.players.length) {
-    return res.status(404).json({ error: 'Player not found' });
-  }
-  console.log('Deleting player with id:', playerId);
-  playersStore.players = filteredPlayers;
-  safeWriteJson(DATA_FILE, playersStore);
-  res.json({ message: 'Player deleted successfully' });
-});
+// Mount API routes
+app.use('/api/player', playerRoutes);
+app.use('/api/match', matchRoutes);
 
 // Serve static files (optional) - serves index.html / app.js if present
 app.use(express.static(path.join(__dirname)));

@@ -1,0 +1,893 @@
+{
+    "players": [
+        {
+            "id": "player-1769919821889",
+            "name": "Laipu",
+            "active": true,
+            "category": "male",
+            "ranking": 5
+        },
+        {
+            "id": "player-1769919829773",
+            "name": "Scott",
+            "active": true,
+            "category": "male",
+            "ranking": 1
+        },
+        {
+            "id": "player-1769919842153",
+            "name": "YuanDong",
+            "active": true,
+            "category": "male",
+            "ranking": 3
+        },
+        {
+            "id": "player-1769919849821",
+            "name": "Weiping",
+            "active": true,
+            "category": "male",
+            "ranking": 2
+        },
+        {
+            "id": "player-1769919861199",
+            "name": "Zibo",
+            "active": true,
+            "category": "male",
+            "ranking": 6
+        },
+        {
+            "id": "player-1769919867663",
+            "name": "Field",
+            "active": true,
+            "category": "male",
+            "ranking": 9
+        },
+        {
+            "id": "player-1769919879111",
+            "name": "Liguang",
+            "active": true,
+            "category": "male",
+            "ranking": 4
+        },
+        {
+            "id": "player-1769919888555",
+            "name": "Keith",
+            "active": true,
+            "category": "male",
+            "ranking": 7
+        },
+        {
+            "id": "player-1769919898635",
+            "name": "Alex",
+            "active": true,
+            "category": "male",
+            "ranking": 11
+        },
+        {
+            "id": "player-1769919903746",
+            "name": "Juntao",
+            "active": true,
+            "category": "male",
+            "ranking": 12
+        },
+        {
+            "id": "player-1769919924350",
+            "name": "Joe",
+            "active": true,
+            "category": "male",
+            "ranking": 10
+        },
+        {
+            "id": "player-1769919929807",
+            "name": "Renyuan",
+            "active": true,
+            "category": "male",
+            "ranking": 8
+        },
+        {
+            "id": "player-1769919942483",
+            "name": "Emily",
+            "active": true,
+            "category": "fun",
+            "ranking": 2
+        },
+        {
+            "id": "player-1769919949166",
+            "name": "Jian",
+            "active": true,
+            "category": "fun",
+            "ranking": 3
+        },
+        {
+            "id": "player-1769919958101",
+            "name": "Tian",
+            "active": true,
+            "category": "fun",
+            "ranking": 5
+        },
+        {
+            "id": "player-1769919965550",
+            "name": "Bohan",
+            "active": true,
+            "category": "fun",
+            "ranking": 1
+        },
+        {
+            "id": "player-1769919974175",
+            "name": "Abby",
+            "active": true,
+            "category": "fun",
+            "ranking": 7
+        },
+        {
+            "id": "player-1769919982169",
+            "name": "Yvonne",
+            "active": true,
+            "category": "fun",
+            "ranking": 8
+        },
+        {
+            "id": "player-1769919988576",
+            "name": "Maymay",
+            "active": true,
+            "category": "fun",
+            "ranking": 4
+        },
+        {
+            "id": "player-1769919996374",
+            "name": "Shiguang",
+            "active": true,
+            "category": "fun",
+            "ranking": 6
+        }
+    ],
+    "groups": [
+        {
+            "id": "male-group-1",
+            "level": 1,
+            "playerIds": [
+                "player-1769919829773",
+                "player-1769919849821",
+                "player-1769919842153",
+                "player-1769919879111"
+            ],
+            "category": "male"
+        },
+        {
+            "id": "male-group-2",
+            "level": 2,
+            "playerIds": [
+                "player-1769919821889",
+                "player-1769919861199",
+                "player-1769919888555",
+                "player-1769919929807"
+            ],
+            "category": "male"
+        },
+        {
+            "id": "male-group-3",
+            "level": 3,
+            "playerIds": [
+                "player-1769919867663",
+                "player-1769919924350",
+                "player-1769919898635",
+                "player-1769919903746"
+            ],
+            "category": "male"
+        },
+        {
+            "id": "fun-group-1",
+            "level": 1,
+            "playerIds": [
+                "player-1769919965550",
+                "player-1769919942483",
+                "player-1769919949166",
+                "player-1769919988576"
+            ],
+            "category": "fun"
+        },
+        {
+            "id": "fun-group-2",
+            "level": 2,
+            "playerIds": [
+                "player-1769919958101",
+                "player-1769919996374",
+                "player-1769919974175",
+                "player-1769919982169"
+            ],
+            "category": "fun"
+        }
+    ],
+    "matches": [
+        {
+            "id": "1-male-group-1-1",
+            "round": 1,
+            "groupId": "male-group-1",
+            "team1": [
+                "player-1769919821889",
+                "player-1769919829773"
+            ],
+            "team2": [
+                "player-1769919842153",
+                "player-1769919849821"
+            ],
+            "score1": 21,
+            "score2": 16,
+            "completed": true,
+            "timestamp": 1769920090414,
+            "category": "male"
+        },
+        {
+            "id": "1-male-group-1-2",
+            "round": 1,
+            "groupId": "male-group-1",
+            "team1": [
+                "player-1769919821889",
+                "player-1769919842153"
+            ],
+            "team2": [
+                "player-1769919829773",
+                "player-1769919849821"
+            ],
+            "score1": 10,
+            "score2": 21,
+            "completed": true,
+            "timestamp": 1769920112820,
+            "category": "male"
+        },
+        {
+            "id": "1-male-group-1-3",
+            "round": 1,
+            "groupId": "male-group-1",
+            "team1": [
+                "player-1769919821889",
+                "player-1769919849821"
+            ],
+            "team2": [
+                "player-1769919829773",
+                "player-1769919842153"
+            ],
+            "score1": 13,
+            "score2": 21,
+            "completed": true,
+            "timestamp": 1769920125672,
+            "category": "male"
+        },
+        {
+            "id": "1-male-group-2-1",
+            "round": 1,
+            "groupId": "male-group-2",
+            "team1": [
+                "player-1769919861199",
+                "player-1769919867663"
+            ],
+            "team2": [
+                "player-1769919879111",
+                "player-1769919888555"
+            ],
+            "score1": 13,
+            "score2": 21,
+            "completed": true,
+            "timestamp": 1769920144390,
+            "category": "male"
+        },
+        {
+            "id": "1-male-group-2-2",
+            "round": 1,
+            "groupId": "male-group-2",
+            "team1": [
+                "player-1769919861199",
+                "player-1769919879111"
+            ],
+            "team2": [
+                "player-1769919867663",
+                "player-1769919888555"
+            ],
+            "score1": 21,
+            "score2": 13,
+            "completed": true,
+            "timestamp": 1769920153193,
+            "category": "male"
+        },
+        {
+            "id": "1-male-group-2-3",
+            "round": 1,
+            "groupId": "male-group-2",
+            "team1": [
+                "player-1769919861199",
+                "player-1769919888555"
+            ],
+            "team2": [
+                "player-1769919867663",
+                "player-1769919879111"
+            ],
+            "score1": 21,
+            "score2": 17,
+            "completed": true,
+            "timestamp": 1769920162488,
+            "category": "male"
+        },
+        {
+            "id": "1-male-group-3-1",
+            "round": 1,
+            "groupId": "male-group-3",
+            "team1": [
+                "player-1769919898635",
+                "player-1769919903746"
+            ],
+            "team2": [
+                "player-1769919924350",
+                "player-1769919929807"
+            ],
+            "score1": 16,
+            "score2": 21,
+            "completed": true,
+            "timestamp": 1769920177260,
+            "category": "male"
+        },
+        {
+            "id": "1-male-group-3-2",
+            "round": 1,
+            "groupId": "male-group-3",
+            "team1": [
+                "player-1769919898635",
+                "player-1769919924350"
+            ],
+            "team2": [
+                "player-1769919903746",
+                "player-1769919929807"
+            ],
+            "score1": 21,
+            "score2": 19,
+            "completed": true,
+            "timestamp": 1769920187227,
+            "category": "male"
+        },
+        {
+            "id": "1-male-group-3-3",
+            "round": 1,
+            "groupId": "male-group-3",
+            "team1": [
+                "player-1769919898635",
+                "player-1769919929807"
+            ],
+            "team2": [
+                "player-1769919903746",
+                "player-1769919924350"
+            ],
+            "score1": 21,
+            "score2": 17,
+            "completed": true,
+            "timestamp": 1769920193572,
+            "category": "male"
+        },
+        {
+            "id": "1-fun-group-1-1",
+            "round": 1,
+            "groupId": "fun-group-1",
+            "team1": [
+                "player-1769919942483",
+                "player-1769919949166"
+            ],
+            "team2": [
+                "player-1769919958101",
+                "player-1769919965550"
+            ],
+            "score1": 21,
+            "score2": 18,
+            "completed": true,
+            "timestamp": 1769920205527,
+            "category": "fun"
+        },
+        {
+            "id": "1-fun-group-1-2",
+            "round": 1,
+            "groupId": "fun-group-1",
+            "team1": [
+                "player-1769919942483",
+                "player-1769919958101"
+            ],
+            "team2": [
+                "player-1769919949166",
+                "player-1769919965550"
+            ],
+            "score1": 17,
+            "score2": 21,
+            "completed": true,
+            "timestamp": 1769920216270,
+            "category": "fun"
+        },
+        {
+            "id": "1-fun-group-1-3",
+            "round": 1,
+            "groupId": "fun-group-1",
+            "team1": [
+                "player-1769919942483",
+                "player-1769919965550"
+            ],
+            "team2": [
+                "player-1769919949166",
+                "player-1769919958101"
+            ],
+            "score1": 21,
+            "score2": 16,
+            "completed": true,
+            "timestamp": 1769920224162,
+            "category": "fun"
+        },
+        {
+            "id": "1-fun-group-2-1",
+            "round": 1,
+            "groupId": "fun-group-2",
+            "team1": [
+                "player-1769919974175",
+                "player-1769919982169"
+            ],
+            "team2": [
+                "player-1769919988576",
+                "player-1769919996374"
+            ],
+            "score1": 5,
+            "score2": 21,
+            "completed": true,
+            "timestamp": 1769920237783,
+            "category": "fun"
+        },
+        {
+            "id": "1-fun-group-2-2",
+            "round": 1,
+            "groupId": "fun-group-2",
+            "team1": [
+                "player-1769919974175",
+                "player-1769919988576"
+            ],
+            "team2": [
+                "player-1769919982169",
+                "player-1769919996374"
+            ],
+            "score1": 21,
+            "score2": 11,
+            "completed": true,
+            "timestamp": 1769920246443,
+            "category": "fun"
+        },
+        {
+            "id": "1-fun-group-2-3",
+            "round": 1,
+            "groupId": "fun-group-2",
+            "team1": [
+                "player-1769919974175",
+                "player-1769919996374"
+            ],
+            "team2": [
+                "player-1769919982169",
+                "player-1769919988576"
+            ],
+            "score1": 21,
+            "score2": 15,
+            "completed": true,
+            "timestamp": 1769920254522,
+            "category": "fun"
+        },
+        {
+            "id": "2-male-group-1-1",
+            "round": 2,
+            "groupId": "male-group-1",
+            "team1": [
+                "player-1769919829773",
+                "player-1769919849821"
+            ],
+            "team2": [
+                "player-1769919842153",
+                "player-1769919879111"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "male"
+        },
+        {
+            "id": "2-male-group-1-2",
+            "round": 2,
+            "groupId": "male-group-1",
+            "team1": [
+                "player-1769919829773",
+                "player-1769919842153"
+            ],
+            "team2": [
+                "player-1769919849821",
+                "player-1769919879111"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "male"
+        },
+        {
+            "id": "2-male-group-1-3",
+            "round": 2,
+            "groupId": "male-group-1",
+            "team1": [
+                "player-1769919829773",
+                "player-1769919879111"
+            ],
+            "team2": [
+                "player-1769919849821",
+                "player-1769919842153"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "male"
+        },
+        {
+            "id": "2-male-group-2-1",
+            "round": 2,
+            "groupId": "male-group-2",
+            "team1": [
+                "player-1769919821889",
+                "player-1769919861199"
+            ],
+            "team2": [
+                "player-1769919888555",
+                "player-1769919929807"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "male"
+        },
+        {
+            "id": "2-male-group-2-2",
+            "round": 2,
+            "groupId": "male-group-2",
+            "team1": [
+                "player-1769919821889",
+                "player-1769919888555"
+            ],
+            "team2": [
+                "player-1769919861199",
+                "player-1769919929807"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "male"
+        },
+        {
+            "id": "2-male-group-2-3",
+            "round": 2,
+            "groupId": "male-group-2",
+            "team1": [
+                "player-1769919821889",
+                "player-1769919929807"
+            ],
+            "team2": [
+                "player-1769919861199",
+                "player-1769919888555"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "male"
+        },
+        {
+            "id": "2-male-group-3-1",
+            "round": 2,
+            "groupId": "male-group-3",
+            "team1": [
+                "player-1769919867663",
+                "player-1769919924350"
+            ],
+            "team2": [
+                "player-1769919898635",
+                "player-1769919903746"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "male"
+        },
+        {
+            "id": "2-male-group-3-2",
+            "round": 2,
+            "groupId": "male-group-3",
+            "team1": [
+                "player-1769919867663",
+                "player-1769919898635"
+            ],
+            "team2": [
+                "player-1769919924350",
+                "player-1769919903746"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "male"
+        },
+        {
+            "id": "2-male-group-3-3",
+            "round": 2,
+            "groupId": "male-group-3",
+            "team1": [
+                "player-1769919867663",
+                "player-1769919903746"
+            ],
+            "team2": [
+                "player-1769919924350",
+                "player-1769919898635"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "male"
+        },
+        {
+            "id": "2-fun-group-1-1",
+            "round": 2,
+            "groupId": "fun-group-1",
+            "team1": [
+                "player-1769919965550",
+                "player-1769919942483"
+            ],
+            "team2": [
+                "player-1769919949166",
+                "player-1769919988576"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "fun"
+        },
+        {
+            "id": "2-fun-group-1-2",
+            "round": 2,
+            "groupId": "fun-group-1",
+            "team1": [
+                "player-1769919965550",
+                "player-1769919949166"
+            ],
+            "team2": [
+                "player-1769919942483",
+                "player-1769919988576"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "fun"
+        },
+        {
+            "id": "2-fun-group-1-3",
+            "round": 2,
+            "groupId": "fun-group-1",
+            "team1": [
+                "player-1769919965550",
+                "player-1769919988576"
+            ],
+            "team2": [
+                "player-1769919942483",
+                "player-1769919949166"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "fun"
+        },
+        {
+            "id": "2-fun-group-2-1",
+            "round": 2,
+            "groupId": "fun-group-2",
+            "team1": [
+                "player-1769919958101",
+                "player-1769919996374"
+            ],
+            "team2": [
+                "player-1769919974175",
+                "player-1769919982169"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "fun"
+        },
+        {
+            "id": "2-fun-group-2-2",
+            "round": 2,
+            "groupId": "fun-group-2",
+            "team1": [
+                "player-1769919958101",
+                "player-1769919974175"
+            ],
+            "team2": [
+                "player-1769919996374",
+                "player-1769919982169"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "fun"
+        },
+        {
+            "id": "2-fun-group-2-3",
+            "round": 2,
+            "groupId": "fun-group-2",
+            "team1": [
+                "player-1769919958101",
+                "player-1769919982169"
+            ],
+            "team2": [
+                "player-1769919996374",
+                "player-1769919974175"
+            ],
+            "score1": null,
+            "score2": null,
+            "completed": false,
+            "timestamp": null,
+            "category": "fun"
+        }
+    ],
+    "currentRound": 2,
+    "adminPassword": "e52026",
+    "rankingModified": false,
+    "roundHistory": [
+        {
+            "round": 1,
+            "rankings": [
+                {
+                    "name": "Scott",
+                    "category": "male",
+                    "group": 1,
+                    "netScore": 24,
+                    "change": "none"
+                },
+                {
+                    "name": "Weiping",
+                    "category": "male",
+                    "group": 1,
+                    "netScore": -2,
+                    "change": "none"
+                },
+                {
+                    "name": "YuanDong",
+                    "category": "male",
+                    "group": 1,
+                    "netScore": -8,
+                    "change": "none"
+                },
+                {
+                    "name": "Laipu",
+                    "category": "male",
+                    "group": 1,
+                    "netScore": -14,
+                    "change": "relegated"
+                },
+                {
+                    "name": "Liguang",
+                    "category": "male",
+                    "group": 2,
+                    "netScore": 12,
+                    "change": "promoted"
+                },
+                {
+                    "name": "Zibo",
+                    "category": "male",
+                    "group": 2,
+                    "netScore": 4,
+                    "change": "none"
+                },
+                {
+                    "name": "Keith",
+                    "category": "male",
+                    "group": 2,
+                    "netScore": 4,
+                    "change": "none"
+                },
+                {
+                    "name": "Field",
+                    "category": "male",
+                    "group": 2,
+                    "netScore": -20,
+                    "change": "relegated"
+                },
+                {
+                    "name": "Renyuan",
+                    "category": "male",
+                    "group": 3,
+                    "netScore": 7,
+                    "change": "promoted"
+                },
+                {
+                    "name": "Joe",
+                    "category": "male",
+                    "group": 3,
+                    "netScore": 3,
+                    "change": "none"
+                },
+                {
+                    "name": "Alex",
+                    "category": "male",
+                    "group": 3,
+                    "netScore": 1,
+                    "change": "none"
+                },
+                {
+                    "name": "Juntao",
+                    "category": "male",
+                    "group": 3,
+                    "netScore": -11,
+                    "change": "none"
+                },
+                {
+                    "name": "Bohan",
+                    "category": "fun",
+                    "group": 1,
+                    "netScore": 6,
+                    "change": "none"
+                },
+                {
+                    "name": "Emily",
+                    "category": "fun",
+                    "group": 1,
+                    "netScore": 4,
+                    "change": "none"
+                },
+                {
+                    "name": "Jian",
+                    "category": "fun",
+                    "group": 1,
+                    "netScore": 2,
+                    "change": "none"
+                },
+                {
+                    "name": "Tian",
+                    "category": "fun",
+                    "group": 1,
+                    "netScore": -12,
+                    "change": "relegated"
+                },
+                {
+                    "name": "Maymay",
+                    "category": "fun",
+                    "group": 2,
+                    "netScore": 20,
+                    "change": "promoted"
+                },
+                {
+                    "name": "Shiguang",
+                    "category": "fun",
+                    "group": 2,
+                    "netScore": 12,
+                    "change": "none"
+                },
+                {
+                    "name": "Abby",
+                    "category": "fun",
+                    "group": 2,
+                    "netScore": 0,
+                    "change": "none"
+                },
+                {
+                    "name": "Yvonne",
+                    "category": "fun",
+                    "group": 2,
+                    "netScore": -32,
+                    "change": "none"
+                }
+            ]
+        }
+    ]
+}
