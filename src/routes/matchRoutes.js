@@ -3,21 +3,44 @@ const { DATA_FILE, safeReadJson, safeWriteJson } = require('../utils/fileUtils')
 
 const router = express.Router();
 
-// POST: Add a new match
+// POST: Add a new match or multiple matches
 router.post('/', (req, res) => {
   const payload = req.body;
-  if (!payload || Object.keys(payload).length === 0) {
+  if (!payload || (Array.isArray(payload) ? payload.length === 0 : Object.keys(payload).length === 0)) {
     return res.status(400).json({ error: 'Empty payload' });
   }
+
   const matchesStore = safeReadJson(DATA_FILE, { matches: [] });
-  const matchId = payload.id;
-  const exist = matchesStore.matches.find(m => m.id === matchId);
-  if (!exist) {
-    matchesStore.matches.push(payload);
+  const matchesToAdd = Array.isArray(payload) ? payload : [payload];
+  const duplicates = [];
+  const added = [];
+
+  matchesToAdd.forEach(match => {
+    if (!match.id) {
+      duplicates.push(`Match missing id`);
+      return;
+    }
+    const exist = matchesStore.matches.find(m => m.id === match.id);
+    if (!exist) {
+      matchesStore.matches.push(match);
+      added.push(match.id);
+    } else {
+      duplicates.push(match.id);
+    }
+  });
+
+  if (added.length > 0) {
     safeWriteJson(DATA_FILE, matchesStore);
-    res.status(201).json({ message: 'Match added successfully', entry: matchesStore.matches[matchesStore.matches.length - 1] });
+  }
+
+  if (duplicates.length === 0) {
+    res.status(201).json({ message: `${added.length} match(es) added successfully`, addedIds: added });
   } else {
-    res.status(409).json({ error: 'Match already exists' });
+    res.status(207).json({ 
+      message: `${added.length} match(es) added, ${duplicates.length} duplicate(s) found`,
+      addedIds: added,
+      duplicates: duplicates 
+    });
   }
 });
 

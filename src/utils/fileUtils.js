@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'badminton_ladder_v2.json');
+const DATA_FILE = path.join(__dirname, '..', 'data', 'badminton_ladder_friday.json');
+const ADMIN_CONFIG_FILE = path.join(__dirname, '..', 'data', 'admin_config.json');
 
 // Safe read helpers (create default if missing)
 function safeReadJson(filePath, defaultValue) {
@@ -23,6 +24,7 @@ function safeWriteJson(filePath, data) {
 
 module.exports = {
   DATA_FILE,
+  ADMIN_CONFIG_FILE,
   safeReadJson,
   safeWriteJson
 };
