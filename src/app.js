@@ -1,13 +1,4 @@
-// 新版本 V2 - 基于排名系统
-let data = { 
-  players: [], 
-  groups: [], 
-  matches: [], 
-  currentRound: 1, 
-  adminPassword: 'e52026',
-  rankingModified: false,
-  roundHistory: []
-};
+const { DATA_FILE, ADMIN_CONFIG_FILE, safeReadJson } = require('./utils/fileUtils');
 
 const CATEGORIES = {
   male: '男双',
@@ -15,15 +6,12 @@ const CATEGORIES = {
   fun: '娱乐'
 };
 
-// Server base URL for API calls. Default to localhost:3000 so client opened from file:// can reach server.
 const SERVER_BASE = (function(){
   try {
-    const host = window.location.hostname;
-    if (host === 'localhost' || host === '127.0.0.1') {
-      return `${window.location.protocol}//${host}:3000`;
-    }
+    const host = safeReadJson(ADMIN_CONFIG_FILE, { admin: { host: 'localhost' } }).admin.host;
+    return `${window.location.protocol}//${host}:8080`;
   } catch (e) {}
-  return 'http://localhost:3000';
+  return 'http://localhost:8080';
 })();
 
 function addDataToServer(path, payload) {
