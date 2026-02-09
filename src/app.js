@@ -1,5 +1,3 @@
-const { DATA_FILE, ADMIN_CONFIG_FILE, safeReadJson } = require('./utils/fileUtils');
-
 const CATEGORIES = {
   male: '男双',
   female: '女双',
@@ -8,10 +6,10 @@ const CATEGORIES = {
 
 const SERVER_BASE = (function(){
   try {
-    const host = safeReadJson(ADMIN_CONFIG_FILE, { admin: { host: 'localhost' } }).admin.host;
-    return `${window.location.protocol}//${host}:8080`;
+    const host = window.location.host;
+    return `${window.location.protocol}//${host}:80`;
   } catch (e) {}
-  return 'http://localhost:8080';
+  return 'http://localhost:80';
 })();
 
 function addDataToServer(path, payload) {
@@ -181,7 +179,6 @@ function renderScore() {
   const pending = currentRoundMatches.filter(m => !m.completed);
 
   select.innerHTML = '<option value="">-- 请选择 --</option>';
-  
   pending.forEach(m => {
     select.innerHTML += `<option value="${m.id}">${m.team1.map(getPlayerName).join('/')} vs ${m.team2.map(getPlayerName).join('/')}</option>`;
     });
@@ -305,7 +302,7 @@ function renderAdmin() {
         : `<button onclick="togglePlayerActive('${p.id}')" class="btn-info" style="padding:5px 10px;font-size:12px;">启用</button>`;
       
       html += `<div class="ranking-item ${statusClass}">
-        <span style="font-weight:bold;min-width:40px;">#${index + 1}</span>
+        <span style="font-weight:bold;min-width:40px;">#${p.ranking}</span>
         <span style="flex:1;">${p.name}</span>
         <span style="color:#666;margin-right:10px;">${CATEGORIES[p.category]}</span>
         <div style="display:flex;gap:5px;">
@@ -561,7 +558,7 @@ async function togglePlayerActive(id) {
   const player = data.players.find(p => p.id === id);
   player.active = !player.active;
 
-  const response = await updateDataToServer('/api/player/', player);
+  const response = await updateDataToServer('/api/player/', { id, active:player.active});
   alert(response.message);
   await syncDataFromServer();
   renderAdmin();
@@ -571,25 +568,20 @@ async function togglePlayerActive(id) {
 
 
 // Edit player ranking in current category
-function editPlayerRanking(playerId) {
+async function editPlayerRanking(playerId) {
   if (hasAnyMatchStarted()) {
     alert('比赛已开始，无法修改排名');
     return;
   }
 
-  const password = prompt('修改排名需要管理员密码：');
-  if (password !== data.adminPassword) {
-    alert('密码错误！');
-    return;
-  }
   const player = data.players.find(p => p.id === playerId);
-  
   const currentRank = player.ranking;
-  const newRank = prompt(`${player.name} 当前排名：第 ${currentRank} 名\n\n请输入新排名（1-${catPlayers.length}）：`);
+  const activePlayersInCategory = data.players.filter(p => p.category === player.category && typeof p.ranking === 'number');
+  const newRank = prompt(`${player.name} 当前排名：第 ${currentRank} 名\n\n请输入新排名（1-${activePlayersInCategory.length}）：`);
   if (!newRank) return;
   
   const newRankNum = parseInt(newRank);
-  if (isNaN(newRankNum) || newRankNum < 1 || newRankNum > catPlayers.length) {
+  if (isNaN(newRankNum) || newRankNum < 1 || newRankNum > activePlayersInCategory.length) {
     alert('无效的排名');
     return;
   }
@@ -598,20 +590,29 @@ function editPlayerRanking(playerId) {
     alert('排名未改变');
     return;
   }
-  
-  updateDataToServer('/api/player/', { playerId, ranking: newRankNum });
 
-  alert(`${player.name} 已调整为第 ${newRankNum} 名！`);
-  alert('请注意：修改排名后需要重新生成分组和比赛！');
-  renderAdmin();
-  renderMatch();
+  const name = prompt('请输入管理员用户名：');
+  const password = prompt('请输入管理员密码：');
+  const adminResponse = await addDataToServer('/api/admin/', { adminName: name, adminPassword: password });
+  if (adminResponse && adminResponse.authenticated) {
+      const result = await updateDataToServer('/api/player/', { id: playerId, ranking: newRankNum });
+      alert(result.message);
+      await syncDataFromServer();
+      alert('请注意：修改排名后需要重新生成分组和比赛！');
+      renderAdmin();
+      renderMatch();
+    } else {
+      alert('管理员验证失败，请检查用户名和密码！');
+      return;
+    }
   
 }
 
 async function generateGroups() {
   const rep = await sendAuthenticatedRequest('/api/grouping', {});
   alert(rep.message);
-  syncDataFromServer();
+  await syncDataFromServer();
+  renderAdmin();
 }
 
 async function generateMatches() {

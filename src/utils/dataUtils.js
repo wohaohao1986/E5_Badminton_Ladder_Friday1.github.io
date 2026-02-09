@@ -5,18 +5,14 @@ const CATEGORIES = {
   fun: '娱乐'
 };
 // remove all matches of current round in given category
-function removeMatchesOnly(category) {
+function removeMatchesInCategory(category) {
   const data = safeReadJson(DATA_FILE, { players: [], groups: [], matches: [] });
-  data.matches = data.matches.filter(m => m.round !== data.currentRound || m.category !== category);
-  safeWriteJson(DATA_FILE, data);
+  return data.matches.filter(m => m.round !== data.currentRound || !m.id.includes(category));
 }
 
 // Generate groups for current round
 function generateGroups() {
   const data = safeReadJson(DATA_FILE, { players: [], groups: [], matches: [] });
-
-  // Clear existing groups of current round
-  data.groups = data.groups.filter(g => g.round !== data.currentRound);
 
   const newGroups = [];
   let msg = '';
@@ -27,42 +23,42 @@ function generateGroups() {
     const total = activePlayers.length;
     
     if (total < 4) return;
-    if (total === 7) {
-      alert(`${CATEGORIES[cat]}无法分组，请调整人数`);
-      return;
+    else if (total === 7 || total === 11) {
+      msg += CATEGORIES[cat] + '无法分组，请调整人数\n';
     }
-    
-    const groupSizes = [];
-    const remainder = total % 4;
-    
-    if (remainder === 0) {
-      // total is divisible by 4: use all 4s
-      for (let i = 0; i < total / 4; i++) groupSizes.push(4);
-    } else if (remainder === 1) {
-      // total = 4k + 1: use (k-1) 4s and one 5
-      for (let i = 0; i < (total / 4 | 0) - 1; i++) groupSizes.push(4);
-      groupSizes.push(5);
-    } else if (remainder === 2) {
-      // total = 4k + 2: use (k-2) 4s and two 5s
-      for (let i = 0; i < (total / 4 | 0) - 2; i++) groupSizes.push(4);
-      groupSizes.push(5, 5);
-    } else {
-      // remainder === 3: total = 4k + 3: use (k-3) 4s and three 5s
-      for (let i = 0; i < (total / 4 | 0) - 3; i++) groupSizes.push(4);
-      groupSizes.push(5, 5, 5);
+    else {
+      const groupSizes = [];
+      const remainder = total % 4;
+      
+      if (remainder === 0) {
+        // total is divisible by 4: use all 4s
+        for (let i = 0; i < total / 4; i++) groupSizes.push(4);
+      } else if (remainder === 1) {
+        // total = 4k + 1: use (k-1) 4s and one 5
+        for (let i = 0; i < (total / 4 | 0) - 1; i++) groupSizes.push(4);
+        groupSizes.push(5);
+      } else if (remainder === 2) {
+        // total = 4k + 2: use (k-2) 4s and two 5s
+        for (let i = 0; i < (total / 4 | 0) - 2; i++) groupSizes.push(4);
+        groupSizes.push(5, 5);
+      } else {
+        // remainder === 3: total = 4k + 3: use (k-3) 4s and three 5s
+        for (let i = 0; i < (total / 4 | 0) - 3; i++) groupSizes.push(4);
+        groupSizes.push(5, 5, 5);
+      }
+      
+      // Assign players to groups
+      let playerIndex = 0;
+      groupSizes.forEach((size, index) => {
+        const playerIds = activePlayers.slice(playerIndex, playerIndex + size).map(p => p.id);
+        const groupId = `${cat}-group-${index + 1}`;
+        newGroups.push({ id: groupId, level: index + 1, playerIds, category: cat });
+        playerIndex += size;
+        });
+        msg += `共生成 ${groupSizes.length} 组\n`;
     }
-    
-    // Assign players to groups
-    let playerIndex = 0;
-    groupSizes.forEach((size, index) => {
-      const playerIds = activePlayers.slice(playerIndex, playerIndex + size).map(p => p.id);
-      const groupId = `${cat}-group-${index + 1}`;
-      newGroups.push({ id: groupId, level: index + 1, playerIds, category: cat });
-      playerIndex += size;
-      });
-      msg += `共生成 ${groupSizes.length} 组\n`;
     });
-  data.groups.push(...newGroups);
+  data.groups = newGroups;
   safeWriteJson(DATA_FILE, data);
   return msg;
 }
@@ -219,7 +215,7 @@ function sortPlayersByCategoryAndRanking() {
 
 module.exports = {
   CATEGORIES,
-  removeMatchesOnly,
+  removeMatchesInCategory,
   sortPlayersByCategoryAndRanking,
   generateGroups,
   generateMatches,

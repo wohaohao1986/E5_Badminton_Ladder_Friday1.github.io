@@ -1,6 +1,6 @@
 const express = require('express');
 const { DATA_FILE, safeReadJson, safeWriteJson } = require('../utils/fileUtils');
-const { CATEGORIES, removeMatchesOnly } = require('../utils/dataUtils');
+const { CATEGORIES, removeMatchesInCategory } = require('../utils/dataUtils');
 const router = express.Router();
 
 // POST: Add a new player
@@ -15,7 +15,8 @@ router.post('/', (req, res) => {
   const exists = playersStore.players.find(p => p.id === newP.id || p.name === newP.name);
   if (!exists) {
     const catPlayers = playersStore.players.filter(p => p.category === newP.category && p.active);
-    newP.ranking = catPlayers.length + 1; // Adding player, set rank to last
+    const rankedPlayersInCat = catPlayers.filter(p => typeof p.ranking === 'number');
+    newP.ranking = rankedPlayersInCat.length + 1; // Adding player, set rank to last
     playersStore.players.push(newP);
     console.log('Added new player:', newP);
     const message = checkAndPromptGroupingMessage(newP.category, playersStore);
@@ -48,6 +49,8 @@ router.put('/', (req, res) => {
       // Player moved categories, remove groups in both categories
       playersStore.groups = removeGroupContainsPlayer(oldCategory, playersStore);
       playersStore.groups = removeGroupContainsPlayer(payload.category, playersStore);
+      playersStore.matches = removeMatchesInCategory(oldCategory);
+      playersStore.matches = removeMatchesInCategory(payload.category);
       msg = `选手${playersStore.players[playerIndex].name}已从${CATEGORIES[oldCategory]}移至${CATEGORIES[payload.category]}分组\n`;
       msg += `请重新生成${CATEGORIES[oldCategory]}和${CATEGORIES[payload.category]}分组\n`;
       msg += checkAndPromptGroupingMessage(oldCategory, playersStore);
@@ -56,12 +59,17 @@ router.put('/', (req, res) => {
 
     // Handle ranking change
     if ('ranking' in payload) {
-      console.log(`Player ranking changed to ${payload.ranking}\n.`);
-      playersStore.players = rankShift(playersStore, payload.category, playerIndex, payload.ranking);
+      console.log(`Player ranking changed to ${payload.ranking}.\n`);
+      playersStore.players = rankShift(playersStore, playersStore.players[playerIndex].category, playerIndex, payload.ranking, null, null);
+      playersStore.groups = removeGroupContainsPlayer(playersStore.players[playerIndex].category, playersStore);
+      playersStore.matches = removeMatchesInCategory(playersStore.players[playerIndex].category);
+      msg += `${playersStore.players[playerIndex].name} 已调整为第 ${payload.ranking} 名！`
     }
     else {
       // No ranking shift needed, update directly
       playersStore.players[playerIndex] = { ...playersStore.players[playerIndex], ...payload };
+      playersStore.groups = removeGroupContainsPlayer(playersStore.players[playerIndex].category, playersStore);
+      playersStore.matches = removeMatchesInCategory(playersStore.players[playerIndex].category);
     }
 
     // Handle active status change
@@ -69,17 +77,22 @@ router.put('/', (req, res) => {
       if(payload.active === true){
         console.log('Player activated:\n', playersStore.players[playerIndex]);
         const catPlayers = playersStore.players.filter(p => p.category === playersStore.players[playerIndex].category && p.active);
-        playersStore.players[playerIndex].ranking = catPlayers.length + 1; // Re-activate player, set rank to last
+        const rankedPlayersInCat = catPlayers.filter(p => typeof p.ranking === 'number');
+        playersStore.players[playerIndex].ranking = rankedPlayersInCat.length + 1; // Re-activate player, set rank to last
+        playersStore.players[playerIndex].active = true;
+        playersStore.matches = removeMatchesInCategory(playersStore.players[playerIndex].category);
         console.log(`Player activated in category ${playersStore.players[playerIndex].category}`);
         msg = checkAndPromptGroupingMessage(playersStore.players[playerIndex].category, playersStore);
       }
       else {
         console.log(`Player deactivated:\n`, playersStore.players[playerIndex]);
         playersStore.players[playerIndex].ranking = '-'; // Deactivate player, set rank to "-"
+        playersStore.players[playerIndex].active = false;
         msg = `选手${playersStore.players[playerIndex].name}已被设为不活跃，无法参加比赛\n`;
         msg += `请重新生成${playersStore.players[playerIndex].category}分组`;
         playersStore.players = rankShift(playersStore, playersStore.players[playerIndex].category, playerIndex, null, false);
         playersStore.groups = removeGroupContainsPlayer(playersStore.players[playerIndex].category, playersStore);
+        playersStore.matches = removeMatchesInCategory(playersStore.players[playerIndex].category);
       }
     }
     safeWriteJson(DATA_FILE, playersStore);
@@ -111,6 +124,7 @@ router.delete('/', (req, res) => {
   // Re-rank after deletion
   playersStore.players = rankShift(playersStore, player.category, null, null, null);
   playersStore.groups = removeGroupContainsPlayer(player.category, playersStore);
+  playersStore.matches = removeMatchesInCategory(player.category);
   let msg = `选手${player.name}已被删除\n请重新生成${CATEGORIES[player.category]}分组`;
   safeWriteJson(DATA_FILE, playersStore);
   res.status(201).json({ message: msg });
@@ -122,7 +136,7 @@ router.delete('/', (req, res) => {
 function rankShift(playersStore, category, playerIndex, rank, isActive) {
   if (playerIndex !== null) {
     // Filter out players with non-numeric rankings (e.g., "-") before sorting
-    const categoryPlayers = playersStore.players
+    let categoryPlayers = playersStore.players
       .filter(p => p.category === category && p.active)
       .sort((a, b) => {
         const rankA = typeof a.ranking === 'number' ? a.ranking : Infinity;
@@ -131,7 +145,8 @@ function rankShift(playersStore, category, playerIndex, rank, isActive) {
       });
     if (rank !== null){
       // take out the player and re-insert at new position
-      categoryPlayers.splice(playerIndex, 1);
+      const currentRank = playersStore.players[playerIndex].ranking;
+      categoryPlayers.splice(currentRank - 1, 1);
       categoryPlayers.splice(rank - 1, 0, playersStore.players[playerIndex]);
     }
     if (isActive !== null && isActive === false) {
@@ -140,13 +155,10 @@ function rankShift(playersStore, category, playerIndex, rank, isActive) {
       categoryPlayers = categoryPlayers.filter(p => p.id !== playersStore.players[playerIndex].id);
     }
     // Reassign rankings
-      categoryPlayers.forEach((p, index) => {
-        if (typeof p.ranking === 'number'){
-          p.ranking = index + 1;
-          const globalIndex = playersStore.players.findIndex(pl => pl.id === p.id);
-          playersStore.players[globalIndex].ranking = p.ranking;
-        }
-      });
+    categoryPlayers.forEach(p => {
+    const globalIndex = playersStore.players.findIndex(pl => pl.id === p.id);
+    playersStore.players[globalIndex].ranking = categoryPlayers.indexOf(p) + 1;
+    });
   }
   else if (category !== null){
     // Re-rank all players in the category
