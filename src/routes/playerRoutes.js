@@ -180,11 +180,9 @@ function checkAndPromptGroupingMessage(category, playersStore) {
   
   if (total < 4) {
     message = `${CATEGORIES[category]}只有${total}人，至少需要4人才能分组`;
-    removeMatchesOnly(category);
   }
   else if (total === 7 || total === 6 || total === 11) {
     message = `${CATEGORIES[category]}现有人数无法分组（${total}人），建议调整至4、5、8、10人或更多`;
-    removeMatchesOnly(category);
   }
   else {
     message = `${CATEGORIES[category]}现有${total}人参赛\n可以生成分组了，请在分组管理中点击“生成本轮分组”按钮`;

@@ -174,29 +174,44 @@ function renderMatch() {
 function renderScore() {
   const select = document.getElementById('score-match');
   let currentRoundMatches = [] ;
+  let html = '';
   if(data.matches && data.matches.length > 0)
     currentRoundMatches = data.matches.filter(m => m.round === data.currentRound);
-  const pending = currentRoundMatches.filter(m => !m.completed);
-
   select.innerHTML = '<option value="">-- 请选择 --</option>';
-  pending.forEach(m => {
-    select.innerHTML += `<option value="${m.id}">${m.team1.map(getPlayerName).join('/')} vs ${m.team2.map(getPlayerName).join('/')}</option>`;
-    });
 
-  const completed = currentRoundMatches.filter(m => m.completed);
-  let html = '';
-  completed.forEach(m => {
-    const time = m.timestamp ? new Date(m.timestamp).toLocaleString('zh-CN') : '';
-    html += `<div class="match-item match-completed">
-      <div>
-        <div>${m.team1.map(getPlayerName).join(' / ')} vs ${m.team2.map(getPlayerName).join(' / ')}</div>
-        <div style="font-size:12px;color:#666;">${time}</div>
-      </div>
-      <div>
-        <span style="font-weight:bold;color:#4CAF50;">${m.score1} : ${m.score2}</span>
-        <button onclick="editScore('${m.id}')" class="btn-warning" style="padding:5px 10px;font-size:12px;margin-left:10px;">修改</button>
-      </div>
-    </div>`;
+  Object.keys(CATEGORIES).forEach(cat => {
+    const pendingMatchIndicateHead = '<option disabled><strong>' + CATEGORIES[cat];
+    const completedMatchIndicateHead = '<div><strong>' + CATEGORIES[cat];
+    const groupInCat = data.groups.filter(g => g.category === cat);
+    groupInCat.forEach(g => {
+      const pendingMatchesInGroup = currentRoundMatches.filter(m => m.groupId === g.id && !m.completed);
+      if(pendingMatchesInGroup.length > 0){
+        const pendingMatchIndicateHtml = pendingMatchIndicateHead + ' Group ' + g.id.split('-').at(-1) + '</strong></option>';
+        select.innerHTML += pendingMatchIndicateHtml;
+        pendingMatchesInGroup.forEach(m => {
+          select.innerHTML += `<option value="${m.id}">${m.team1.map(getPlayerName).join('/')} vs ${m.team2.map(getPlayerName).join('/')}</option>`;
+        });
+      }
+
+      const completedMatchesInGroup = currentRoundMatches.filter(m => m.groupId === g.id && m.completed);
+      if (completedMatchesInGroup.length > 0){
+        const completedMatchIndicateHtml = completedMatchIndicateHead + ' Group ' + g.id.split('-').at(-1) + '</strong></div>';
+        html += completedMatchIndicateHtml;
+        completedMatchesInGroup.forEach(m => {
+        const time = m.timestamp ? new Date(m.timestamp).toLocaleString('zh-CN') : '';
+        html += `<div class="match-item match-completed">
+            <div>
+              <div>${m.team1.map(getPlayerName).join(' / ')} vs ${m.team2.map(getPlayerName).join(' / ')}</div>
+              <div style="font-size:12px;color:#666;">${time}</div>
+            </div>
+            <div>
+              <span style="font-weight:bold;color:#4CAF50;">${m.score1} : ${m.score2}</span>
+              <button onclick="editScore('${m.id}')" class="btn-warning" style="padding:5px 10px;font-size:12px;margin-left:10px;">修改</button>
+            </div>
+          </div>`;
+        });
+      }
+    });
   });
   document.getElementById('completed-matches').innerHTML = html || '<p>暂无已完成比赛</p>';
 }
@@ -637,7 +652,7 @@ async function finishRound() {
 
   const msg = await sendAuthenticatedRequest('/api/finishRound', {});
   alert(msg.message);
-  syncDataFromServer();
+  await syncDataFromServer();
   renderAdmin();
   renderMatch();
   renderRanking();
