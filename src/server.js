@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const { safeReadJson, safeWriteJson } = require('./utils/fileUtils');
 const { DATA_FILE, ADMIN_CONFIG_FILE } = require('./utils/fileUtils');
-const { sortPlayersByCategoryAndRanking, generateGroups, generateMatches, finishRound } = require('./utils/dataUtils');
+const { sortPlayersByCategoryAndRanking, generateGroups, generateMatches, finishRound, autoFillScores } = require('./utils/dataUtils');
 
 // Import route handlers
 const playerRoutes = require('./routes/playerRoutes');
@@ -52,6 +52,16 @@ app.post('/api/generateMatch', (req, res) => {
 app.post('/api/finishRound', (req, res) => {
   try {
     const msg = finishRound();
+    res.json({ message: msg });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/randomScoring', (req, res) => {
+  try {
+    console.log("随机报分");
+    const msg = autoFillScores();
     res.json({ message: msg });
   } catch (error) {
     res.status(500).json({ error: error.message });

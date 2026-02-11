@@ -1,8 +1,7 @@
 const { DATA_FILE, ADMIN_CONFIG_FILE, safeReadJson, safeWriteJson } = require('./fileUtils');
 const CATEGORIES = {
-  male: '男双',
-  female: '女双',
-  fun: '娱乐'
+  tiger: 'Tiger',
+  dragon: 'Dragon'
 };
 // remove all matches of current round in given category
 function removeMatchesInCategory(category) {
@@ -107,21 +106,20 @@ function finishRound() {
 
   Object.keys(CATEGORIES).forEach(cat => {
     msg += `\n=== ${CATEGORIES[cat]} ===\n`;
+    let promoted = '排名上升：';
+    let relegated = '排名下降：';
     // Get groups in this category sorted by level
     const catGroups = data.groups.filter(g => g.category === cat).sort((a, b) => a.level - b.level);
     if (catGroups.length === 0) return;
-    
     // Sort players within each group by net scores in this round
     const groupRankings = catGroups.map(g => {
-      const groupMatches = data.matches.filter(m => m.groupId === g.id);
+      const groupMatchesThisRound = data.matches.filter(m => m.groupId === g.id && m.round === data.currentRound);
       const rankings = g.playerIds.map(id => {
-        const stats = calculatePlayerStats(id, groupMatches);
+        const stats = calculatePlayerStatsByMatches(id, groupMatchesThisRound);
         return { id, netScore: stats.netScore };
       }).sort((a, b) => b.netScore - a.netScore);
       return { groupId: g.id, level: g.level, rankings };
     });
-    let promotedNames = '排名上升：';
-    let relegatedNames = '排名下降：';
     // Record round rankings and determine promotions/relegations
     groupRankings.forEach((group, idx) => {
       group.rankings.forEach((r, rankIdx) => {
@@ -129,11 +127,11 @@ function finishRound() {
         let change = 'none';
         if (idx > 0 && rankIdx === 0) {
           change = 'promoted';
-          promotedNames += `${player.name}, `;
+          promoted += `${player.name}, `;
         }
         if (idx < groupRankings.length - 1 && rankIdx === group.rankings.length - 1) {
           change = 'relegated';
-          relegatedNames += `${player.name}, `;
+          relegated += `${player.name}, `;
         }
         roundRankingsToChange.push({
           name: player.name,
@@ -143,7 +141,6 @@ function finishRound() {
           change: change
         });
       });
-      msg += promotedNames + '\n' + relegatedNames + '\n';
     });
     
     // Create a new ranking list to reflect promotions/relegations
@@ -166,9 +163,12 @@ function finishRound() {
         data.players[playerIndex].ranking = index + 1;
       }
     });
+    msg += promoted + '\n' + relegated + '\n';
   });
   
   data.roundHistory.push({ round: data.currentRound, rankings: roundRankingsToChange });
+  // Clear current groups
+  data.groups.length = 0;
   data.currentRound++;
   safeWriteJson(DATA_FILE, data);
   msg += '请截图保存本轮升降名次详情以备查阅！';
@@ -176,7 +176,7 @@ function finishRound() {
 }
 
 // Calculate wins and net score for a player in given matches
-function calculatePlayerStats(playerId, matches) {
+function calculatePlayerStatsByMatches(playerId, matches) {
   let wins = 0, netScore = 0;
   matches.forEach(m => {
     if (!m.completed) return;
@@ -213,12 +213,49 @@ function sortPlayersByCategoryAndRanking() {
   return sortedPlayers;
 }
 
+function autoFillScores(){
+  const data = safeReadJson(DATA_FILE, { players: [], matches: [] });
+  const currentMatches = data.matches.filter(m => m.round === data.currentRound && !m.completed);
+   if (currentMatches.length === 0) {
+    return '没有待报分的比赛';
+  }
+  currentMatches.forEach(m => {
+    const winner = Math.random() > 0.5 ? 1 : 2;
+    const winScoreType = Math.random();
+    let winScore, loseScore;
+    
+    if (winScoreType < 0.7) {
+      winScore = 21;
+      loseScore = Math.floor(Math.random() * 10) + 10;
+    } else if (winScoreType < 0.85) {
+      winScore = 22;
+      loseScore = 20;
+    } else {
+      winScore = 23;
+      loseScore = 21;
+    }
+    
+    const score1 = winner === 1 ? winScore : loseScore;
+    const score2 = winner === 2 ? winScore : loseScore;
+    
+    data.matches = data.matches.map(match => {
+      if (match.id === m.id) {
+        return { ...match, score1, score2, completed: true, timestamp: Date.now() };
+      }
+      return match;
+    });
+  });
+  safeWriteJson(DATA_FILE, data);
+  return '随机报分完成';
+}
+
 module.exports = {
   CATEGORIES,
   removeMatchesInCategory,
   sortPlayersByCategoryAndRanking,
   generateGroups,
   generateMatches,
-  finishRound
+  finishRound,
+  autoFillScores
 };
 

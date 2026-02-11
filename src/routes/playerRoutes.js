@@ -41,8 +41,12 @@ router.put('/', (req, res) => {
     // Handle category change
     if ('category' in payload) {
       console.log(`Player category changed to ${payload.category}`);
-      const oldCategory = playersStore.players[playerIndex].category;
+      const player = playersStore.players[playerIndex];
+      const oldCategory = player.category;
       playersStore.players[playerIndex].category = payload.category;
+      // Set ranking to last in new categotry
+      if(player.active)
+        playersStore.players[playerIndex].ranking = playersStore.players.filter(p => p.category === payload.category && p.active).length;
       // Re-rank both old and new categories
       playersStore.players = rankShift(playersStore, oldCategory, null, null, null);
       playersStore.players = rankShift(playersStore, payload.category, null, null, null);

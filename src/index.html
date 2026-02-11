@@ -160,7 +160,17 @@
 
     <div id="page-history" class="hidden">
       <h1>历史记录</h1>
-      <div id="history-content"></div>
+      <div id="history-content">
+        <div class="card">
+          <div class="mb-15">
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">选择轮次</label>
+            <select id="round-select" onchange="updateRoundHistory()">
+              <option value="">-- 请选择 --</option>
+            </select>
+          </div>
+          <div id="round-history" class="hidden"></div>
+        </div>
+      </div>
     </div>
 
     <div id="page-admin" class="hidden">
@@ -180,9 +190,8 @@
         <h2>添加选手</h2>
         <div class="flex">
           <select id="new-player-category" style="width:120px;">
-            <option value="male">男双</option>
-            <option value="female">女双</option>
-            <option value="fun">娱乐</option>
+            <option value="tiger">Tiger</option>
+            <option value="dragon">Dragon</option>
           </select>
           <input type="text" id="new-player-name" placeholder="输入选手姓名" style="flex: 1;">
           <button onclick="addPlayer()" class="btn-primary">添加</button>

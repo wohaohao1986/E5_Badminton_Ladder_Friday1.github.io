@@ -1,7 +1,6 @@
 const CATEGORIES = {
-  male: '男双',
-  female: '女双',
-  fun: '娱乐'
+  tiger: 'Tiger',
+  dragon: 'Dragon'
 };
 
 const SERVER_BASE = (function(){
@@ -240,31 +239,32 @@ function renderRanking() {
 
 function renderHistory() {
   const container = document.getElementById('history-content');
+  const select = document.getElementById('round-select');
   if (!data || !data.matches || data.matches.length === 0) {
     container.innerHTML = '<div class="card"><p>暂无历史记录</p></div>';
     return;
   }
+  select.innerHTML = '<option value="">-- 请选择 --</option>';
+  for (let r = data.currentRound - 1; r > 0; r--) {
+    select.innerHTML += `<option value="${r}">第${r}轮</option>`;
+  }
+}
 
-  const maxRound = Math.max(...data.matches.map(m => m.round));
-  let html = '';
+function updateRoundHistory(){
+  const container = document.getElementById('round-history');
+  const round = document.getElementById('round-select').value;
 
-  for (let r = maxRound; r >= 1; r--) {
-    const roundMatches = data.matches.filter(m => m.round === r && m.completed);
-    if (roundMatches.length === 0) continue;
+  const roundHistory = data.roundHistory.filter(item => item.round.toString() === round)[0];
+  const roundMatches = data.matches.filter(m => m.round.toString() === round && m.completed);
 
-    html += `<div class="card"><h2>第 ${r} 轮</h2>`;
-    
-    const roundHistory = data.roundHistory.find(rh => rh.round === r);
-    if (roundHistory) {
-      html += '<h3 style="margin-top:15px;">本轮排名与升降级</h3>';
-      
-      Object.keys(CATEGORIES).forEach(cat => {
-        const catRankings = roundHistory.rankings.filter(item => item.category === cat);
-        if (catRankings.length === 0) return;
-        
-        html += `<h4 style="color:#4CAF50;margin-top:15px;">${CATEGORIES[cat]}</h4>`;
-        html += '<table style="margin-bottom:15px;"><thead><tr><th>排名</th><th>选手</th><th style="text-align:center;">组别</th><th style="text-align:center;">净胜分</th><th style="text-align:center;">升降级</th></tr></thead><tbody>';
-        catRankings.forEach((item, index) => {
+  let html = `<div class="card"><h2>第 ${round} 轮</h2>`;
+
+  Object.keys(CATEGORIES).forEach(cat =>{
+    const rankings = roundHistory.rankings.filter(item => item.category === cat);
+    if (rankings.length === 0) return;
+    html += `<h3 style="color:#4CAF50;margin-top:15px;">${CATEGORIES[cat]}</h3>`;
+    html += '<table style="margin-bottom:15px;"><thead><tr><th>排名</th><th>选手</th><th style="text-align:center;">组别</th><th style="text-align:center;">净胜分</th><th style="text-align:center;">升降级</th></tr></thead><tbody>';
+    rankings.forEach((item, index) => {
           let changeIcon = '';
           if (item.change === 'promoted') changeIcon = '<span style="color:#4CAF50;">↑ 升级</span>';
           else if (item.change === 'relegated') changeIcon = '<span style="color:#f44336;">↓ 降级</span>';
@@ -278,12 +278,11 @@ function renderHistory() {
             <td style="text-align:center;">${changeIcon}</td>
           </tr>`;
         });
-        html += '</tbody></table>';
-      });
-    }
-    
-    html += '<h3>比赛结果</h3>';
-    roundMatches.forEach(m => {
+    html += '</tbody></table>';
+  });
+
+  html += '<h3>比赛结果</h3>';
+  roundMatches.forEach(m => {
       const time = m.timestamp ? new Date(m.timestamp).toLocaleString('zh-CN') : '';
       html += `<div class="match-item match-completed">
         <div>
@@ -293,10 +292,9 @@ function renderHistory() {
         <span style="font-weight:bold;">${m.score1} : ${m.score2}</span>
       </div>`;
     });
-    html += '</div>';
-  }
-
+  html += '</div>';
   container.innerHTML = html;
+  container.classList.remove('hidden');
 }
 
 function renderAdmin() {
@@ -319,7 +317,6 @@ function renderAdmin() {
       html += `<div class="ranking-item ${statusClass}">
         <span style="font-weight:bold;min-width:40px;">#${p.ranking}</span>
         <span style="flex:1;">${p.name}</span>
-        <span style="color:#666;margin-right:10px;">${CATEGORIES[p.category]}</span>
         <div style="display:flex;gap:5px;">
           <button onclick="changePlayerCategory('${p.id}')" class="btn-info" style="padding:5px 10px;font-size:12px;">改类别</button>
           <button onclick="editPlayerRanking('${p.id}')" class="btn-info" style="padding:5px 10px;font-size:12px;">改排名</button>
@@ -479,9 +476,9 @@ async function changePlayerCategory(id) {
   const player = data.players.find(p => p.id === id);
   if (!player) return;
   
-  const newCat = prompt(`${player.name} 当前类别：${CATEGORIES[player.category]}\n\n请输入新类别：\n1 - 男双\n2 - 女双\n3 - 娱乐`);
+  const newCat = prompt(`${player.name} 当前类别：${CATEGORIES[player.category]}\n\n请输入新类别：\n1 - Tiger\n2 - Dragon`);
   
-  const catMap = {'1': 'male', '2': 'female', '3': 'fun'};
+  const catMap = {'1': 'tiger', '2': 'dragon'};
   const selectedCat = catMap[newCat];
   
   if (!selectedCat) {
@@ -497,10 +494,11 @@ async function changePlayerCategory(id) {
   // send update to server and handle any server-side warnings
   const serverRes = await updateDataToServer('/api/player', {id: id, category: selectedCat});
   await syncDataFromServer();
+  const newPlayer = data.players.find(p => p.id === id);
   if (serverRes && serverRes.status === 'warning') {
     alert(serverRes.message);
   } else {
-    alert(`${player.name} 已改为${CATEGORIES[selectedCat]}，排名第${player.ranking}名`);
+    alert(`${player.name} 已改为${CATEGORIES[selectedCat]}，排名第${newPlayer.ranking}名`);
     renderAdmin();
     renderMatch();
   }
@@ -624,6 +622,10 @@ async function editPlayerRanking(playerId) {
 }
 
 async function generateGroups() {
+  if (hasAnyMatchStarted()) {
+    alert('比赛已开始，无法修改');
+    return;
+  }
   const rep = await sendAuthenticatedRequest('/api/grouping', {});
   alert(rep.message);
   await syncDataFromServer();
@@ -631,6 +633,10 @@ async function generateGroups() {
 }
 
 async function generateMatches() {
+  if (hasAnyMatchStarted()) {
+    alert('比赛已开始，无法修改');
+    return;
+  }
   const rep = await sendAuthenticatedRequest('/api/generateMatch', {});
   alert(rep.message);
   syncDataFromServer();
@@ -655,6 +661,7 @@ async function finishRound() {
   await syncDataFromServer();
   renderAdmin();
   renderMatch();
+  renderHistory();
   renderRanking();
 }
 
@@ -664,51 +671,13 @@ function getPlayerName(id) {
   return player ? player.name : '未知';
 }
 
-function autoFillScores() {
-  const password = prompt('随机报分需要管理员密码：');
-  if (password !== data.adminPassword) {
-    alert('密码错误！');
-    return;
-  }
-  
+async function autoFillScores() {
   if (!confirm('确定要为所有未完成的比赛随机生成分数吗？')) return;
+
+  const result = await sendAuthenticatedRequest('/api/randomScoring', {});
+  alert(result.message);
   
-  const currentMatches = data.matches.filter(m => m.round === data.currentRound && !m.completed);
-  
-  if (currentMatches.length === 0) {
-    alert('没有待报分的比赛');
-    return;
-  }
-  
-  currentMatches.forEach(m => {
-    const winner = Math.random() > 0.5 ? 1 : 2;
-    const winScoreType = Math.random();
-    let winScore, loseScore;
-    
-    if (winScoreType < 0.7) {
-      winScore = 21;
-      loseScore = Math.floor(Math.random() * 10) + 10;
-    } else if (winScoreType < 0.85) {
-      winScore = 22;
-      loseScore = 20;
-    } else {
-      winScore = 23;
-      loseScore = 21;
-    }
-    
-    const score1 = winner === 1 ? winScore : loseScore;
-    const score2 = winner === 2 ? winScore : loseScore;
-    
-    data.matches = data.matches.map(match => {
-      if (match.id === m.id) {
-        return { ...match, score1, score2, completed: true, timestamp: Date.now() };
-      }
-      return match;
-    });
-  });
-  
-  saveData();
-  alert(`已为 ${currentMatches.length} 场比赛随机生成分数！`);
+  await syncDataFromServer();
   renderScore();
 }
 
