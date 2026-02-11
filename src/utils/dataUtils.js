@@ -117,7 +117,7 @@ function finishRound() {
       const rankings = g.playerIds.map(id => {
         const stats = calculatePlayerStatsByMatches(id, groupMatchesThisRound);
         return { id, netScore: stats.netScore };
-      }).sort((a, b) => b.netScore - a.netScore);
+      }).sort((a, b) => compareTwoPlayerStats(a, b));
       return { groupId: g.id, level: g.level, rankings };
     });
     // Record round rankings and determine promotions/relegations
@@ -211,6 +211,23 @@ function sortPlayersByCategoryAndRanking() {
   });
   
   return sortedPlayers;
+}
+
+// Helper function to compare two players to determine ranks in group
+function compareTwoPlayerStats(playerOne, playerTwo){
+  const data = safeReadJson(DATA_FILE, { players: [] });
+  if (playerOne.netScore > playerTwo.netScore)
+    return -1;
+  else if (playerOne.netScore < playerTwo.netScore){
+    return 1;
+  }
+  else{ // Handle same net scores, use current rank to sort
+    const playerOneRank = data.players.find(p => p.id === playerOne.id).ranking;
+    const playerTwoRank = data.players.find(p => p.id === playerTwo.id).ranking;
+    if (playerOneRank > playerTwoRank)
+      return -1;
+  return 1;
+  }
 }
 
 function autoFillScores(){
