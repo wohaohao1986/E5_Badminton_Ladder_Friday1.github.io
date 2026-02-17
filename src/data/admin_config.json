@@ -1,0 +1,8 @@
+{
+    "admin": {
+        "host": "localhost",
+        "username": "e5admin",
+        "password": "e5ladder"
+    }
+    
+}

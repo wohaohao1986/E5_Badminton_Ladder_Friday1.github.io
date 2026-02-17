@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>羽毛球 Ladder League V2</title>
+  <title>E5 Badminton Ladder League Friday</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; }
@@ -42,15 +42,81 @@
 <body>
   <div class="nav">
     <button onclick="showPage('home')" id="nav-home" class="active">首页</button>
+    <button onclick="showPage('match')" id="nav-match">当前比赛</button>
     <button onclick="showPage('score')" id="nav-score">报分</button>
     <button onclick="showPage('ranking')" id="nav-ranking">总排名</button>
     <button onclick="showPage('history')" id="nav-history">历史记录</button>
-    <button onclick="showPage('rules')" id="nav-rules">规则说明</button>
     <button onclick="showPage('admin')" id="nav-admin">管理</button>
   </div>
 
+
   <div class="container">
     <div id="page-home">
+      <h1>欢迎使用 E5羽毛球俱乐部 Ladder 工具！请阅读比赛规则说明和使用说明</h1>
+      <div class="card">
+        <h2>规则说明</h2>
+        <div class="card">
+          <h3>核心规则</h3>
+          <ul style="line-height:1.8;">
+            <li>所有选手按排名顺序分组</li>
+            <li>分成4人组和5人组（4人组优先）</li>
+            <li>不支持3人以下和7人组（需调整人数）</li>
+            <li>每人与组内其他所有人各搭档一次</li>
+            <li>在一方到达11分时，双方互换场地</li>
+            <li>比赛计分：抢21分，组内只按净胜分排名</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>升降级规则</h3>
+          <ul style="line-height:1.8;">
+            <li>每组按本轮净胜分排名</li>
+            <li>第1名升级，插入上一组末尾</li>
+            <li>最后1名降级，插入下一组开头</li>
+            <li>首组第1名和末组最后1名不升降级</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3>管理员功能</h3>
+          <ul style="line-height:1.8;">
+            <li>可手动调整选手的排名</li>
+            <li>新选手默认排在最后，可手动调整</li>
+            <li>重新生成分组和比赛</li>
+            <li>只有管理员可删除选手</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>使用说明</h2>
+        <div class="card">
+          <h3>基本流程</h3>
+          <ol style="line-height:1.8;">
+            <li>添加新选手 （新选手默认排在最后，可手动调整）</li>
+            <li>在管理页面，调整选手排名（需管理员权限）</li>
+            <li>在管理页面，生成分组和生成比赛（需管理员权限）</li>
+            <li><strong>注意：生成前请确保所有选手排名已正确设置, 自动分组目前以4人组为优先，最末的几组根据人数调整为5人组</strong></li>
+            <li>选手在报分页面 找到打过的比赛进行报分</li>
+            <li>在管理页面手动结束本轮，程序会自动根据净胜分进行升降级</li>
+            <li>按照以上步骤重复，进行下一轮比赛</li>
+          </ol>
+        </div>
+        <div class="card">
+          <h3>注意事项</h3>
+          <ul style="line-height:1.8;">
+            <li><strong>进行以下操作后，由于涉及到排名和分类，与之相关联的分组和比赛将被清空，需重新生成分组和比赛</strong></li>
+            <li>选手排名修改后</li>
+            <li>选手分类修改后</li>
+            <li>启用或禁用选手后</li>
+            <li>添加或删除选手后</li>
+            <li>如有比赛已经开始，上述操作均无法进行，如有意外情况请比赛结束后联系管理员修改比赛信息</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div id="page-match" class="hidden">
       <h1>E5羽毛球俱乐部 Ladder League - 第 <span id="home-round">1</span> 轮</h1>
       <div id="home-groups"></div>
     </div>
@@ -94,42 +160,16 @@
 
     <div id="page-history" class="hidden">
       <h1>历史记录</h1>
-      <div id="history-content"></div>
-    </div>
-
-    <div id="page-rules" class="hidden">
-      <h1>规则说明</h1>
-      <div class="card">
-        <h2>核心规则</h2>
-        <ul style="line-height:1.8;">
-          <li>所有选手按排名顺序分组</li>
-          <li>优先分成4人组和5人组，只在6人和11人时使用6人组</li>
-          <li>不支持3人以下和7人组（需调整人数）</li>
-          <li>每人与组内其他所有人各搭档一次</li>
-          <li>6人组特殊规则：头两名需要搭档两次，其中一次对战最后两名的搭档</li>
-          <li>比赛计分：21分制，组内只按净胜分排名</li>
-        </ul>
-      </div>
-
-      <div class="card">
-        <h2>升降级规则</h2>
-        <ul style="line-height:1.8;">
-          <li>每组按本轮净胜分排名</li>
-          <li>第1名升级，插入上一组末尾</li>
-          <li>最后1名降级，插入下一组开头</li>
-          <li>首组第1名和末组最后1名不升降级</li>
-          <li>每轮结束后清空历史数据，只保留当前排名</li>
-        </ul>
-      </div>
-
-      <div class="card">
-        <h2>管理员功能</h2>
-        <ul style="line-height:1.8;">
-          <li>可手动调整任何选手的排名</li>
-          <li>新选手默认排在最后，可手动调整</li>
-          <li>修改排名后需重新生成分组</li>
-          <li>只有管理员可删除选手、清空数据</li>
-        </ul>
+      <div id="history-content">
+        <div class="card">
+          <div class="mb-15">
+            <label style="display: block; margin-bottom: 5px; font-weight: bold;">选择轮次</label>
+            <select id="round-select" onchange="updateRoundHistory()">
+              <option value="">-- 请选择 --</option>
+            </select>
+          </div>
+          <div id="round-history" class="hidden"></div>
+        </div>
       </div>
     </div>
 
@@ -139,26 +179,19 @@
       <div class="card">
         <h2>分组管理</h2>
         <div class="flex" style="flex-wrap: wrap;">
-          <button onclick="generateWeeklyGroups()" id="btn-generate" class="btn-secondary">生成本轮分组</button>
-          <button onclick="toggleEditGroups()" id="btn-edit-groups" class="btn-info">手动调整分组</button>
+          <button onclick="generateGroups()" id="btn-generate-groups" class="btn-secondary">生成本轮分组</button>
+          <button onclick="generateMatches()" id="btn-generate-matches" class="btn-secondary">生成本轮比赛</button>
           <button onclick="finishRound()" class="btn-warning">本轮结束（升降级）</button>
         </div>
         <div id="current-groups" class="mt-20"></div>
-        <div id="edit-groups-panel" class="hidden mt-20">
-          <h3>手动调整分组</h3>
-          <div id="edit-groups-content"></div>
-          <button onclick="saveGroupEdits()" class="btn-primary" style="margin-top:15px;">保存分组</button>
-          <button onclick="toggleEditGroups()" class="btn-secondary" style="margin-top:15px;margin-left:10px;">取消</button>
-        </div>
       </div>
 
       <div class="card">
         <h2>添加选手</h2>
         <div class="flex">
           <select id="new-player-category" style="width:120px;">
-            <option value="male">男双</option>
-            <option value="female">女双</option>
-            <option value="fun">娱乐</option>
+            <option value="tiger">Tiger</option>
+            <option value="dragon">Dragon</option>
           </select>
           <input type="text" id="new-player-name" placeholder="输入选手姓名" style="flex: 1;">
           <button onclick="addPlayer()" class="btn-primary">添加</button>
@@ -166,8 +199,7 @@
       </div>
 
       <div class="card">
-        <h2>排名管理 (<span id="player-count">0</span>人，<span id="active-count">0</span>人参赛）</h2>
-        <button onclick="editPlayerRanking()" class="btn-warning" style="margin-bottom:15px;">修改选手排名</button>
+        <h2>排名管理 （<span id="player-count">0</span>人，<span id="active-count">0</span>人参赛）</h2>
         <div id="player-ranking-list"></div>
       </div>
 
@@ -179,12 +211,6 @@
         <p>分组数：<span id="stat-groups">0</span> 组</p>
         <p>本轮比赛：<span id="stat-matches">0</span> 场</p>
         <p>已完成：<span id="stat-completed">0</span> 场</p>
-        <div class="mt-20">
-          <button onclick="exportData()" class="btn-secondary">导出数据备份</button>
-          <button onclick="importData()" class="btn-info" style="margin-left:10px;">导入数据</button>
-          <button onclick="changePassword()" class="btn-warning" style="margin-left:10px;">修改管理员密码</button>
-          <button onclick="resetAllData()" class="btn-danger" style="margin-left:10px;">清空所有数据</button>
-        </div>
       </div>
     </div>
   </div>
