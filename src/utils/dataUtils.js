@@ -3,68 +3,93 @@ const CATEGORIES = {
   tiger: 'Tiger',
   dragon: 'Dragon'
 };
-// remove all matches of current round in given category
+const currentDateTime = new Date().toLocaleString('en-US', {
+   year: 'numeric',
+   month: '2-digit',
+   day: '2-digit',
+   hour: '2-digit',
+   minute: '2-digit',
+   second: '2-digit'
+});
+// Example Output: 03/12/2024, 12:45:30 PM
+
+// Helper: Load data with safe defaults
+function loadData() {
+  return safeReadJson(DATA_FILE, { players: [], groups: [], matches: [], currentRound: 1, roundHistory: [] });
+}
+
+// Helper: Get active players in a category, sorted by ranking
+function getActivePlayers(data, category) {
+  return data.players.filter(p => p.active && p.category === category).sort((a, b) => a.ranking - b.ranking);
+}
+
+// Remove all matches of current round in given category
 function removeMatchesInCategory(category) {
-  const data = safeReadJson(DATA_FILE, { players: [], groups: [], matches: [] });
+  const data = loadData();
   return data.matches.filter(m => m.round !== data.currentRound || !m.id.includes(category));
+}
+
+// Helper: Calculate group sizes for given total
+function calculateGroupSizes(total) {
+  const groupSizes = [];
+  const remainder = total % 4;
+  const baseFours = (total / 4) | 0;
+  
+  if (remainder === 0) {
+    for (let i = 0; i < baseFours; i++) groupSizes.push(4);
+  } else if (remainder === 1) {
+    for (let i = 0; i < baseFours - 1; i++) groupSizes.push(4);
+    groupSizes.push(5);
+  } else if (remainder === 2) {
+    for (let i = 0; i < baseFours - 2; i++) groupSizes.push(4);
+    groupSizes.push(5, 5);
+  } else { // remainder === 3
+    for (let i = 0; i < baseFours - 3; i++) groupSizes.push(4);
+    groupSizes.push(5, 5, 5);
+  }
+  return groupSizes;
 }
 
 // Generate groups for current round
 function generateGroups() {
-  const data = safeReadJson(DATA_FILE, { players: [], groups: [], matches: [] });
-
+  const data = loadData();
   const newGroups = [];
-  let msg = '';
+  const messages = {};
   
   Object.keys(CATEGORIES).forEach(cat => {
-    msg += CATEGORIES[cat] + '分组情况：\n';
-    const activePlayers = data.players.filter(p => p.active && p.category === cat).sort((a, b) => a.ranking - b.ranking);
+    messages[cat] = CATEGORIES[cat] + '分组情况：\n';
+    const activePlayers = getActivePlayers(data, cat);
     const total = activePlayers.length;
     
-    if (total < 4) return;
-    else if (total === 7 || total === 11) {
-      msg += CATEGORIES[cat] + '无法分组，请调整人数\n';
+    if (total < 4) {
+      messages[cat] += CATEGORIES[cat] + '只有' + total + '人，至少需要4人才能分组\n';
+      return;
     }
-    else {
-      const groupSizes = [];
-      const remainder = total % 4;
-      
-      if (remainder === 0) {
-        // total is divisible by 4: use all 4s
-        for (let i = 0; i < total / 4; i++) groupSizes.push(4);
-      } else if (remainder === 1) {
-        // total = 4k + 1: use (k-1) 4s and one 5
-        for (let i = 0; i < (total / 4 | 0) - 1; i++) groupSizes.push(4);
-        groupSizes.push(5);
-      } else if (remainder === 2) {
-        // total = 4k + 2: use (k-2) 4s and two 5s
-        for (let i = 0; i < (total / 4 | 0) - 2; i++) groupSizes.push(4);
-        groupSizes.push(5, 5);
-      } else {
-        // remainder === 3: total = 4k + 3: use (k-3) 4s and three 5s
-        for (let i = 0; i < (total / 4 | 0) - 3; i++) groupSizes.push(4);
-        groupSizes.push(5, 5, 5);
-      }
-      
-      // Assign players to groups
-      let playerIndex = 0;
-      groupSizes.forEach((size, index) => {
-        const playerIds = activePlayers.slice(playerIndex, playerIndex + size).map(p => p.id);
-        const groupId = `${cat}-group-${index + 1}`;
-        newGroups.push({ id: groupId, level: index + 1, playerIds, category: cat });
-        playerIndex += size;
-        });
-        msg += `共生成 ${groupSizes.length} 组\n`;
+    if (total === 7 || total === 11) {
+      messages[cat] += CATEGORIES[cat] + '无法分组，请调整人数\n';
+      return;
     }
+    
+    const groupSizes = calculateGroupSizes(total);
+    // Assign players to groups
+    let playerIndex = 0;
+    groupSizes.forEach((size, index) => {
+      const playerIds = activePlayers.slice(playerIndex, playerIndex + size).map(p => p.id);
+      const groupId = `${cat}-group-${index + 1}`;
+      newGroups.push({ id: groupId, level: index + 1, playerIds, category: cat });
+      playerIndex += size;
     });
+    messages[cat] += `共生成 ${groupSizes.length} 组\n`;
+  });
+  
   data.groups = newGroups;
   safeWriteJson(DATA_FILE, data);
-  return msg;
+  return Object.values(messages).join('');
 }
 
 // Generate round-robin matches for all groups
 function generateMatches() {
-  const data = safeReadJson(DATA_FILE, { players: [], groups: [], matches: [] });
+  const data = loadData();
 
   // Remove existing matches of current round
   data.matches = data.matches.filter(m => m.round !== data.currentRound);
@@ -73,8 +98,7 @@ function generateMatches() {
     data.matches.push(...generateRoundRobinMatches(group.playerIds, data.currentRound, group.id));
   });
   safeWriteJson(DATA_FILE, data);
-  msg = `为本轮的 ${data.groups.length} 组生成了比赛`;
-  return msg;
+  return `为本轮的 ${data.groups.length} 组生成了比赛`;
 }
 
 // Helper to generate round-robin matches for a 4-player or 5-player group
@@ -100,14 +124,13 @@ function generateRoundRobinMatches(playerIds, round, groupId) {
 }
 
 function finishRound() {
-  const data = safeReadJson(DATA_FILE, { players: [], groups: [], matches: [], currentRound: 1, roundHistory: [] });
+  const data = loadData();
   const roundRankingsToChange = [];
-  let msg = '本轮比赛结束，升降名次详情如下：\n';
+  const categoryMessages = {};
 
   Object.keys(CATEGORIES).forEach(cat => {
-    msg += `\n=== ${CATEGORIES[cat]} ===\n`;
-    let promoted = '排名上升：';
-    let relegated = '排名下降：';
+    const promoted = [];
+    const relegated = [];
     // Get groups in this category sorted by level
     const catGroups = data.groups.filter(g => g.category === cat).sort((a, b) => a.level - b.level);
     if (catGroups.length === 0) return;
@@ -117,7 +140,7 @@ function finishRound() {
       const rankings = g.playerIds.map(id => {
         const stats = calculatePlayerStatsByMatches(id, groupMatchesThisRound);
         return { id, netScore: stats.netScore };
-      }).sort((a, b) => compareTwoPlayerStats(a, b));
+      }).sort((a, b) => compareTwoPlayerStats(a, b, data));
       return { groupId: g.id, level: g.level, rankings };
     });
     // Record round rankings and determine promotions/relegations
@@ -127,11 +150,11 @@ function finishRound() {
         let change = 'none';
         if (idx > 0 && rankIdx === 0) {
           change = 'promoted';
-          promoted += `${player.name}, `;
+          promoted.push(player.name);
         }
         if (idx < groupRankings.length - 1 && rankIdx === group.rankings.length - 1) {
           change = 'relegated';
-          relegated += `${player.name}, `;
+          relegated.push(player.name);
         }
         roundRankingsToChange.push({
           name: player.name,
@@ -148,11 +171,11 @@ function finishRound() {
     for (let i = 0; i < groupRankings.length; i++) {
       const rankings = groupRankings[i].rankings;
       if (i === 0) {
-        newRanking.push(...rankings.map(r => r.id)); // top group, directly add
+        newRanking.push(...rankings.map(r => r.id));
       } else {
-        const promoted = rankings[0].id;
-        const relegated = groupRankings[i - 1].rankings[groupRankings[i - 1].rankings.length - 1].id;
-        newRanking.splice(newRanking.length - 1, 1, promoted, relegated);
+        const promotedId = rankings[0].id;
+        const relegatedId = groupRankings[i - 1].rankings[groupRankings[i - 1].rankings.length - 1].id;
+        newRanking.splice(newRanking.length - 1, 1, promotedId, relegatedId);
         newRanking.push(...rankings.slice(1).map(r => r.id));
       }
     }
@@ -163,7 +186,10 @@ function finishRound() {
         data.players[playerIndex].ranking = index + 1;
       }
     });
-    msg += promoted + '\n' + relegated + '\n';
+    
+    categoryMessages[cat] = `\n=== ${CATEGORIES[cat]} ===\n`;
+    categoryMessages[cat] += `排名上升：${promoted.join(', ')}\n`;
+    categoryMessages[cat] += `排名下降：${relegated.join(', ')}\n`;
   });
   
   data.roundHistory.push({ round: data.currentRound, rankings: roundRankingsToChange });
@@ -171,6 +197,9 @@ function finishRound() {
   data.groups.length = 0;
   data.currentRound++;
   safeWriteJson(DATA_FILE, data);
+  
+  let msg = '本轮比赛结束，升降名次详情如下：\n';
+  msg += Object.values(categoryMessages).join('');
   msg += '请截图保存本轮升降名次详情以备查阅！';
   return msg;
 }
@@ -193,86 +222,90 @@ function calculatePlayerStatsByMatches(playerId, matches) {
   return { wins, netScore };
 }
 
-// Sort players by category and ranking
 function sortPlayersByCategoryAndRanking() {
-  const data = safeReadJson(DATA_FILE, { players: [] });
-
-  const categoryOrder = ['male', 'female', 'fun'];
+  const data = loadData();
+  const categoryOrder = ['tiger', 'dragon'];
   
-  const sortedPlayers = data.players.sort((a, b) => {
+  return data.players.sort((a, b) => {
     const catA = categoryOrder.indexOf(a.category);
     const catB = categoryOrder.indexOf(b.category);
-    if (catA !== catB) {
-      return catA - catB;
-    }
+    if (catA !== catB) return catA - catB;
+    
     const rankA = typeof a.ranking === 'number' ? a.ranking : Infinity;
     const rankB = typeof b.ranking === 'number' ? b.ranking : Infinity;
     return rankA - rankB;
   });
+}
+
+// Helper: Compare two players to determine ranks in group
+function compareTwoPlayerStats(playerOne, playerTwo, data) {
+  if (playerOne.netScore > playerTwo.netScore) return -1;
+  if (playerOne.netScore < playerTwo.netScore) return 1;
   
-  return sortedPlayers;
+  // Same net score: use current ranking to break tie
+  const rankOne = data.players.find(p => p.id === playerOne.id)?.ranking ?? Infinity;
+  const rankTwo = data.players.find(p => p.id === playerTwo.id)?.ranking ?? Infinity;
+  return rankTwo - rankOne; // Higher rank (lower number) comes first
 }
 
-// Helper function to compare two players to determine ranks in group
-function compareTwoPlayerStats(playerOne, playerTwo){
-  const data = safeReadJson(DATA_FILE, { players: [] });
-  if (playerOne.netScore > playerTwo.netScore)
-    return -1;
-  else if (playerOne.netScore < playerTwo.netScore){
-    return 1;
-  }
-  else{ // Handle same net scores, use current rank to sort
-    const playerOneRank = data.players.find(p => p.id === playerOne.id).ranking;
-    const playerTwoRank = data.players.find(p => p.id === playerTwo.id).ranking;
-    if (playerOneRank > playerTwoRank)
-      return -1;
-  return 1;
-  }
-}
-
-function autoFillScores(){
-  const data = safeReadJson(DATA_FILE, { players: [], matches: [] });
+function autoFillScores() {
+  const data = loadData();
   const currentMatches = data.matches.filter(m => m.round === data.currentRound && !m.completed);
-   if (currentMatches.length === 0) {
+  
+  if (currentMatches.length === 0) {
     return '没有待报分的比赛';
   }
+  
   currentMatches.forEach(m => {
-    const winner = Math.random() > 0.5 ? 1 : 2;
-    const winScoreType = Math.random();
-    let winScore, loseScore;
-    
-    if (winScoreType < 0.7) {
-      winScore = 21;
-      loseScore = Math.floor(Math.random() * 10) + 10;
-    } else if (winScoreType < 0.85) {
-      winScore = 22;
-      loseScore = 20;
-    } else {
-      winScore = 23;
-      loseScore = 21;
+    const scores = generateRandomScore();
+    const matchIndex = data.matches.findIndex(match => match.id === m.id);
+    if (matchIndex !== -1) {
+      data.matches[matchIndex].score1 = scores.score1;
+      data.matches[matchIndex].score2 = scores.score2;
+      data.matches[matchIndex].completed = true;
+      data.matches[matchIndex].timestamp = Date.now();
     }
-    
-    const score1 = winner === 1 ? winScore : loseScore;
-    const score2 = winner === 2 ? winScore : loseScore;
-    
-    data.matches = data.matches.map(match => {
-      if (match.id === m.id) {
-        return { ...match, score1, score2, completed: true, timestamp: Date.now() };
-      }
-      return match;
-    });
   });
+  
   safeWriteJson(DATA_FILE, data);
   return '随机报分完成';
 }
 
+// Helper: Generate random badminton match score
+function generateRandomScore() {
+  const winner = Math.random() > 0.5 ? 1 : 2;
+  const winScoreType = Math.random();
+  let winScore, loseScore;
+  
+  if (winScoreType < 0.7) {
+    winScore = 21;
+    loseScore = Math.floor(Math.random() * 10) + 10;
+  } else if (winScoreType < 0.85) {
+    winScore = 22;
+    loseScore = 20;
+  } else {
+    winScore = 23;
+    loseScore = 21;
+  }
+  
+  return {
+    score1: winner === 1 ? winScore : loseScore,
+    score2: winner === 2 ? winScore : loseScore
+  };
+}
+
 module.exports = {
   CATEGORIES,
+  currentDateTime,
   removeMatchesInCategory,
   sortPlayersByCategoryAndRanking,
   generateGroups,
   generateMatches,
   finishRound,
-  autoFillScores
+  autoFillScores,
+  loadData,
+  getActivePlayers,
+  calculateGroupSizes,
+  generateRandomScore
 };
 

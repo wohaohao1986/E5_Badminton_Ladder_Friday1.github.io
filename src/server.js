@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const { safeReadJson, safeWriteJson } = require('./utils/fileUtils');
 const { DATA_FILE, ADMIN_CONFIG_FILE } = require('./utils/fileUtils');
-const { sortPlayersByCategoryAndRanking, generateGroups, generateMatches, finishRound, autoFillScores } = require('./utils/dataUtils');
+const { currentDateTime, sortPlayersByCategoryAndRanking, generateGroups, generateMatches, finishRound, autoFillScores } = require('./utils/dataUtils');
 
 // Import route handlers
 const playerRoutes = require('./routes/playerRoutes');
@@ -32,6 +32,7 @@ app.get('/api/main', (req, res) => {
 
 // Endpoint to generate groups and matches for current round
 app.post('/api/grouping', (req, res) => {
+  console.log(`[${currentDateTime}] Request to generate groups`);
   try {
     const msg = generateGroups();
     res.json({ message: msg });
@@ -41,6 +42,7 @@ app.post('/api/grouping', (req, res) => {
 });
 
 app.post('/api/generateMatch', (req, res) => {
+  console.log(`[${currentDateTime}] Request to generate matches`);
   try {
     const msg = generateMatches();
     res.json({ message: msg });
@@ -50,6 +52,7 @@ app.post('/api/generateMatch', (req, res) => {
 });
 
 app.post('/api/finishRound', (req, res) => {
+  console.log(`[${currentDateTime}] Request to finish current round`);
   try {
     const msg = finishRound();
     res.json({ message: msg });
@@ -59,8 +62,8 @@ app.post('/api/finishRound', (req, res) => {
 });
 
 app.post('/api/randomScoring', (req, res) => {
+  console.log("Do random scoring");
   try {
-    console.log("随机报分");
     const msg = autoFillScores();
     res.json({ message: msg });
   } catch (error) {
