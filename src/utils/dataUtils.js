@@ -15,7 +15,7 @@ const currentDateTime = new Date().toLocaleString('en-US', {
 
 // Helper: Load data with safe defaults
 function loadData() {
-  return safeReadJson(DATA_FILE, { players: [], groups: [], matches: [], currentRound: 1, roundHistory: [] });
+  return safeReadJson(DATA_FILE, { players: [], groups: [], matches: [], currentRound: 1, roundHistory: [], matchHistory: [] });
 }
 
 // Helper: Get active players in a category, sorted by ranking
@@ -193,6 +193,11 @@ function finishRound() {
   });
   
   data.roundHistory.push({ round: data.currentRound, rankings: roundRankingsToChange });
+  // Save all completed matches of current round to matchHistory
+  const currentRoundMatches = data.matches.filter(m => m.round === data.currentRound);
+  data.matchHistory.push(...currentRoundMatches);
+  // Remove current round matches from data.matches
+  data.matches = data.matches.filter(m => m.round !== data.currentRound);
   // Clear current groups
   data.groups.length = 0;
   data.currentRound++;
