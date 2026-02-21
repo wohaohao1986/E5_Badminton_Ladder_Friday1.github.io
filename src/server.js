@@ -31,7 +31,7 @@ app.get('/api/main', (req, res) => {
 });
 
 // Endpoint to generate groups and matches for current round
-app.post('/api/grouping', (req, res) => {
+app.put('/api/grouping', (req, res) => {
   console.log(`[${currentDateTime}] Request to generate groups`);
   try {
     const msg = generateGroups();
@@ -41,7 +41,7 @@ app.post('/api/grouping', (req, res) => {
   }
 });
 
-app.post('/api/generateMatch', (req, res) => {
+app.put('/api/generateMatch', (req, res) => {
   console.log(`[${currentDateTime}] Request to generate matches`);
   try {
     const msg = generateMatches();
@@ -51,7 +51,7 @@ app.post('/api/generateMatch', (req, res) => {
   }
 });
 
-app.post('/api/finishRound', (req, res) => {
+app.put('/api/finishRound', (req, res) => {
   console.log(`[${currentDateTime}] Request to finish current round`);
   try {
     const msg = finishRound();
@@ -61,7 +61,7 @@ app.post('/api/finishRound', (req, res) => {
   }
 });
 
-app.post('/api/randomScoring', (req, res) => {
+app.put('/api/randomScoring', (req, res) => {
   console.log("Do random scoring");
   try {
     const msg = autoFillScores();

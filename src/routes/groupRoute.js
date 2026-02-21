@@ -1,5 +1,6 @@
 const express = require('express');
 const { DATA_FILE, safeReadJson, safeWriteJson } = require('../utils/fileUtils');
+const { generateRoundRobinMatches, rankShift } = require('../utils/dataUtils');
 const router = express.Router();
 
 // POST: Add a new group or multiple groups
@@ -41,6 +42,50 @@ router.post('/', (req, res) => {
       duplicates: duplicates 
     });
   }
+});
+
+router.put('/resetGroup', (req, res) => {
+  const payload = req.body;
+  if (!payload || !payload.groupId || !payload.playerIds || !Array.isArray(payload.playerIds)) {
+    return res.status(400).json({ error: 'Invalid payload. Required: groupId, playerIds array' });
+  }
+  
+  const { groupId, playerIds } = payload;
+  const data = safeReadJson(DATA_FILE, { players: [], groups: [], matches: [], currentRound: 1 });
+  
+  // Find the group
+  const group = data.groups.find(g => g.id === groupId);
+  if (!group) {
+    return res.status(404).json({ error: 'Group not found' });
+  }
+  
+  // Get the category from the group
+  const category = group.category;
+  
+  // 1. Remove all matches in current round of this group
+  data.matches = data.matches.filter(m => !(m.round === data.currentRound && m.groupId === groupId));
+  
+  // 2. Regenerate matches for selected players
+  const newMatches = generateRoundRobinMatches(playerIds, data.currentRound, groupId);
+  data.matches.push(...newMatches);
+  
+  // 3. For rest of players, set rank to '-' and active to false, use rankShift
+  const deactivatePlayerIds = group.playerIds.filter(id => !playerIds.includes(id));
+  deactivatePlayerIds.forEach(playerId => {
+    const playerIdx = data.players.findIndex(p => p.id === playerId);
+    if (playerIdx !== -1) {
+      data.players[playerIdx].active = false;
+      rankShift(data, category, playerIdx, null, false);
+    }
+  });
+  
+  // Remove deactivated players from the group
+  group.playerIds = playerIds;
+  
+  // 4. Write data back to file
+  safeWriteJson(DATA_FILE, data);
+  
+  res.status(200).json({ message: `Group ${groupId} has been reset with ${playerIds.length} players` });
 });
 
 // DELETE: Remove a group or multiple groups

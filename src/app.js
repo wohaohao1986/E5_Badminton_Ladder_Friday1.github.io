@@ -112,7 +112,13 @@ function promptForAdminCredentials() {
       document.body.removeChild(container);
       resolve({ name: nameInput.value, password: passwordInput.value });
     };
-    
+    // Allow pressing Enter to confirm
+    container.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        okBtn.click();
+      }
+    });
     const cancelBtn = document.createElement('button');
     cancelBtn.textContent = '取消';
     cancelBtn.style.cssText = 'padding: 8px 20px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;';
@@ -141,7 +147,7 @@ async function sendAuthenticatedRequest(endpoint, payload) {
 
   const adminResponse = await addDataToServer('/api/admin/', { adminName: credentials.name, adminPassword: credentials.password });
   if (adminResponse && adminResponse.authenticated) {
-    return addDataToServer(endpoint, payload);
+    return updateDataToServer(endpoint, payload);
   } else {
     alert('管理员验证失败，请检查用户名和密码！');
   }
@@ -666,21 +672,171 @@ async function editPlayerRanking(playerId) {
     return;
   }
 
-  const name = prompt('请输入管理员用户名：');
-  const password = prompt('请输入管理员密码：');
-  const adminResponse = await addDataToServer('/api/admin/', { adminName: name, adminPassword: password });
-  if (adminResponse && adminResponse.authenticated) {
-      const result = await updateDataToServer('/api/player/', { id: playerId, ranking: newRankNum });
-      alert(result.message);
-      await syncDataFromServer();
-      alert('请注意：修改排名后需要重新生成分组和比赛！');
-      renderAdmin();
-      renderMatch();
-    } else {
-      alert('管理员验证失败，请检查用户名和密码！');
-      return;
-    }
+  const result = await sendAuthenticatedRequest('/api/player/', { id: playerId, ranking: newRankNum });
+  if (result) {
+    alert(result.message);
+    await syncDataFromServer();
+    alert('请注意：修改排名后需要重新生成分组和比赛！');
+    renderAdmin();
+    renderMatch();
+  }
+}
+
+async function resetPlayersInGroup() {
+  const groups = data.groups;
   
+  if (groups.length === 0) {
+    alert('没有可用的分组');
+    return;
+  }
+
+  const result = await showGroupPlayerSelector(groups);
+  if (!result) return;
+
+  const response = await sendAuthenticatedRequest('/api/group/resetGroup', {
+    groupId: result.groupId,
+    playerIds: result.playerIds
+  });
+  
+  alert(response.message || '分组已重置');
+  await syncDataFromServer();
+  renderAdmin();
+}
+
+// Helper function -- for resetPlayersInGroup to show group and player selector modal
+function showGroupPlayerSelector(groups) {
+  return new Promise((resolve) => {
+    const container = document.createElement('div');
+    container.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000; overflow-y: auto;';
+    
+    const modal = document.createElement('div');
+    modal.style.cssText = 'background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); max-width: 500px; width: 90%; margin: 20px auto;';
+    
+    const title = document.createElement('h3');
+    title.textContent = '重置分组';
+    title.style.cssText = 'margin-top: 0; margin-bottom: 20px; color: #333;';
+    
+    const groupLabel = document.createElement('div');
+    groupLabel.textContent = '选择分组：';
+    groupLabel.style.cssText = 'margin-bottom: 8px; font-size: 14px; color: #666; font-weight: bold;';
+    
+    const groupSelect = document.createElement('select');
+    groupSelect.style.cssText = 'width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; margin-bottom: 20px;';
+    groupSelect.innerHTML = '<option value="">-- 请选择 --</option>';
+    
+    groups.forEach(g => {
+      const categoryName = CATEGORIES[g.category] || g.category;
+      const option = document.createElement('option');
+      option.value = g.id;
+      option.textContent = `${categoryName} 第 ${g.level} 组`;
+      groupSelect.appendChild(option);
+    });
+    
+    const playersContainer = document.createElement('div');
+    playersContainer.style.cssText = 'display: none; margin-bottom: 20px;';
+    
+    const playersLabel = document.createElement('div');
+    playersLabel.textContent = '选择选手（未选择的选手将会被停用）：';
+    playersLabel.style.cssText = 'margin-bottom: 10px; font-size: 14px; color: #666; font-weight: bold;';
+    playersContainer.appendChild(playersLabel);
+    
+    const playersList = document.createElement('div');
+    playersList.style.cssText = 'border: 1px solid #ddd; border-radius: 4px; padding: 10px; max-height: 300px; overflow-y: auto;';
+    playersContainer.appendChild(playersList);
+    
+    groupSelect.addEventListener('change', () => {
+      const selectedGroup = groups.find(g => g.id === groupSelect.value);
+      
+      if (selectedGroup) {
+        playersList.innerHTML = '';
+        selectedGroup.playerIds.forEach(playerId => {
+          const playerName = getPlayerName(playerId);
+          const checkboxDiv = document.createElement('div');
+          checkboxDiv.style.cssText = 'margin-bottom: 10px; padding: 12px; display: flex; align-items: center; background: #fafafa; border: 1px solid #eee; border-radius: 4px; transition: all 0.2s ease; cursor: pointer;';
+          
+          // Add hover effect
+          checkboxDiv.addEventListener('mouseenter', () => {
+            checkboxDiv.style.backgroundColor = '#f0f0f0';
+            checkboxDiv.style.borderColor = '#4CAF50';
+          });
+          checkboxDiv.addEventListener('mouseleave', () => {
+            checkboxDiv.style.backgroundColor = '#fafafa';
+            checkboxDiv.style.borderColor = '#eee';
+          });
+          
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = playerId;
+          checkbox.checked = true;
+          checkbox.style.cssText = 'width: 18px; height: 18px; margin-right: 12px; cursor: pointer; accent-color: #4CAF50;';
+          
+          const label = document.createElement('label');
+          label.textContent = playerName;
+          label.style.cssText = 'font-size: 15px; font-weight: 500; cursor: pointer; flex: 1; color: #333;';
+          label.htmlFor = checkbox.id;
+          
+          // Toggle checkbox when clicking anywhere on the div
+          checkboxDiv.addEventListener('click', (e) => {
+            if (e.target !== checkbox) {
+              checkbox.checked = !checkbox.checked;
+            }
+          });
+          
+          checkboxDiv.appendChild(checkbox);
+          checkboxDiv.appendChild(label);
+          playersList.appendChild(checkboxDiv);
+        });
+        
+        playersContainer.style.display = 'block';
+      } else {
+        playersContainer.style.display = 'none';
+      }
+    });
+    
+    const btnContainer = document.createElement('div');
+    btnContainer.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end;';
+    
+    const okBtn = document.createElement('button');
+    okBtn.textContent = '确定';
+    okBtn.style.cssText = 'padding: 8px 20px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;';
+    okBtn.onclick = () => {
+      const selectedGroupId = groupSelect.value;
+      if (!selectedGroupId) {
+        alert('请选择一个分组');
+        return;
+      }
+      
+      const selectedPlayerIds = Array.from(playersList.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+      
+      if (selectedPlayerIds.length === 0) {
+        alert('请至少选择一个选手');
+        return;
+      }
+      
+      document.body.removeChild(container);
+      resolve({ groupId: selectedGroupId, playerIds: selectedPlayerIds });
+    };
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = '取消';
+    cancelBtn.style.cssText = 'padding: 8px 20px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;';
+    cancelBtn.onclick = () => {
+      document.body.removeChild(container);
+      resolve(null);
+    };
+    
+    btnContainer.appendChild(okBtn);
+    btnContainer.appendChild(cancelBtn);
+    
+    modal.appendChild(title);
+    modal.appendChild(groupLabel);
+    modal.appendChild(groupSelect);
+    modal.appendChild(playersContainer);
+    modal.appendChild(btnContainer);
+    container.appendChild(modal);
+    document.body.appendChild(container);
+    
+  });
 }
 
 async function generateGroups() {

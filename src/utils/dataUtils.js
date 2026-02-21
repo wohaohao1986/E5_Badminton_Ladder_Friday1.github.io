@@ -87,6 +87,46 @@ function generateGroups() {
   return Object.values(messages).join('');
 }
 
+// Shift ranks in a category after certain operations (e.g., ranking change or deletion)
+function rankShift(playersStore, category, playerIndex, rank, isActive) {
+  if (playerIndex !== null) {
+    let categoryPlayers = playersStore.players
+      .filter(p => p.category === category && p.active)
+      .sort((a, b) => {
+        const rankA = typeof a.ranking === 'number' ? a.ranking : Infinity;
+        const rankB = typeof b.ranking === 'number' ? b.ranking : Infinity;
+        return rankA - rankB;
+      });
+    
+    if (rank !== null) {
+      const currentRank = playersStore.players[playerIndex].ranking;
+      categoryPlayers.splice(currentRank - 1, 1);
+      categoryPlayers.splice(rank - 1, 0, playersStore.players[playerIndex]);
+    }
+    
+    if (isActive === false) {
+      playersStore.players[playerIndex].ranking = '-';
+      categoryPlayers = categoryPlayers.filter(p => p.id !== playersStore.players[playerIndex].id);
+    }
+    
+    // Reassign rankings
+    categoryPlayers.forEach(p => {
+      const globalIndex = playersStore.players.findIndex(pl => pl.id === p.id);
+      playersStore.players[globalIndex].ranking = categoryPlayers.indexOf(p) + 1;
+    });
+  } else if (category !== null) {
+    // Re-rank all players in the category
+    const categoryPlayers = playersStore.players
+      .filter(p => p.category === category && p.active)
+      .sort((a, b) => a.ranking - b.ranking);
+    
+    categoryPlayers.forEach((p, index) => {
+      const globalIndex = playersStore.players.findIndex(pl => pl.id === p.id);
+      playersStore.players[globalIndex].ranking = index + 1;
+    });
+  }
+}
+
 // Generate round-robin matches for all groups
 function generateMatches() {
   const data = loadData();
@@ -306,11 +346,13 @@ module.exports = {
   sortPlayersByCategoryAndRanking,
   generateGroups,
   generateMatches,
+  rankShift,
   finishRound,
   autoFillScores,
   loadData,
   getActivePlayers,
   calculateGroupSizes,
-  generateRandomScore
+  generateRandomScore,
+  generateRoundRobinMatches
 };
 
