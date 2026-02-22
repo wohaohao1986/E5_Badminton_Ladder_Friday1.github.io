@@ -235,6 +235,33 @@ function finishRound() {
   data.roundHistory.push({ round: data.currentRound, rankings: roundRankingsToChange });
   // Save all completed matches of current round to matchHistory
   const currentRoundMatches = data.matches.filter(m => m.round === data.currentRound);
+  
+  // Update each player's stats with matches from this round
+  data.players.forEach(player => {
+    const playerMatches = currentRoundMatches.filter(m => m.completed && (m.team1.includes(player.id) || m.team2.includes(player.id)));
+    if (playerMatches.length > 0) {
+      // Separate into 21-point and 15-point matches
+      const twentyOneMatches = playerMatches.filter(m => Math.max(m.score1, m.score2) === 21);
+      const fifteenMatches = playerMatches.filter(m => Math.max(m.score1, m.score2) === 15);
+      
+      // Update 21-point stats
+      if (twentyOneMatches.length > 0) {
+        const twentyOneStats = calculatePlayerStatsByMatches(player.id, twentyOneMatches);
+        player.numberOfMatchesTwentyOne = (player.numberOfMatchesTwentyOne || 0) + twentyOneMatches.length;
+        player.winsTwentyOne = (player.winsTwentyOne || 0) + twentyOneStats.wins;
+        player.totalNetScoreTwentyOne = (player.totalNetScoreTwentyOne || 0) + twentyOneStats.netScore;
+      }
+      
+      // Update 15-point stats
+      if (fifteenMatches.length > 0) {
+        const fifteenStats = calculatePlayerStatsByMatches(player.id, fifteenMatches);
+        player.numberOfMatchesFifteen = (player.numberOfMatchesFifteen || 0) + fifteenMatches.length;
+        player.winsFifteen = (player.winsFifteen || 0) + fifteenStats.wins;
+        player.totalNetScoreFifteen = (player.totalNetScoreFifteen || 0) + fifteenStats.netScore;
+      }
+    }
+  });
+  
   data.matchHistory.push(...currentRoundMatches);
   // Remove current round matches from data.matches
   data.matches = data.matches.filter(m => m.round !== data.currentRound);
@@ -265,6 +292,51 @@ function calculatePlayerStatsByMatches(playerId, matches) {
     }
   });
   return { wins, netScore };
+}
+
+function calculatePlayerStats() {
+  const data = loadData();
+  
+  // For each player, calculate their stats from matchHistory separated by match type
+  data.players.forEach(player => {
+    console.log(`Calculating stats for player: ${player.name}`);
+    
+    // Separate completed matches into 21-point and 15-point matches
+    const twentyOneMatches = data.matchHistory.filter(match => {
+      return match.completed && 
+             (match.team1.includes(player.id) || match.team2.includes(player.id)) &&
+             Math.max(match.score1, match.score2) === 21;
+    });
+    
+    const fifteenMatches = data.matchHistory.filter(match => {
+      return match.completed && 
+             (match.team1.includes(player.id) || match.team2.includes(player.id)) &&
+             Math.max(match.score1, match.score2) === 15;
+    });
+    
+    // Calculate stats for 21-point matches
+    const twentyOneStats = calculatePlayerStatsByMatches(player.id, twentyOneMatches);
+    player.numberOfMatchesTwentyOne = twentyOneMatches.length;
+    player.winsTwentyOne = twentyOneStats.wins;
+    player.totalNetScoreTwentyOne = twentyOneStats.netScore;
+    
+    // Calculate stats for 15-point matches
+    const fifteenStats = calculatePlayerStatsByMatches(player.id, fifteenMatches);
+    player.numberOfMatchesFifteen = fifteenMatches.length;
+    player.winsFifteen = fifteenStats.wins;
+    player.totalNetScoreFifteen = fifteenStats.netScore;
+  });
+  
+  // Step 4: Write the updated data back to the file
+  safeWriteJson(DATA_FILE, data);
+}
+
+function calculateElo() {
+  const data = loadData();
+  data.players.forEach(player => {
+    player.elo = parseFloat((1000 + (player.winsTwentyOne * 2) + (player.winsFifteen * 1.5) + (player.totalNetScoreTwentyOne * 0.6) + (player.totalNetScoreFifteen * 0.8)).toFixed(2));
+  });
+  safeWriteJson(DATA_FILE, data);
 }
 
 function sortPlayersByCategoryAndRanking() {
@@ -319,19 +391,8 @@ function autoFillScores() {
 // Helper: Generate random badminton match score
 function generateRandomScore() {
   const winner = Math.random() > 0.5 ? 1 : 2;
-  const winScoreType = Math.random();
-  let winScore, loseScore;
-  
-  if (winScoreType < 0.7) {
-    winScore = 21;
-    loseScore = Math.floor(Math.random() * 10) + 10;
-  } else if (winScoreType < 0.85) {
-    winScore = 22;
-    loseScore = 20;
-  } else {
-    winScore = 23;
-    loseScore = 21;
-  }
+  const winScore = 21; // Winner always gets 21
+  const loseScore = Math.floor(Math.random() * 10) + 10; // Loser gets random score between 10-19
   
   return {
     score1: winner === 1 ? winScore : loseScore,
@@ -349,6 +410,8 @@ module.exports = {
   rankShift,
   finishRound,
   autoFillScores,
+  calculatePlayerStats,
+  calculateElo,
   loadData,
   getActivePlayers,
   calculateGroupSizes,

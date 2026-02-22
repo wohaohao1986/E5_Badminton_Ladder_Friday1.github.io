@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const { safeReadJson, safeWriteJson } = require('./utils/fileUtils');
 const { DATA_FILE, ADMIN_CONFIG_FILE } = require('./utils/fileUtils');
-const { currentDateTime, sortPlayersByCategoryAndRanking, generateGroups, generateMatches, finishRound, autoFillScores } = require('./utils/dataUtils');
+const { currentDateTime, sortPlayersByCategoryAndRanking, generateGroups, generateMatches, finishRound, autoFillScores, calculatePlayerStats, calculateElo } = require('./utils/dataUtils');
 
 // Import route handlers
 const playerRoutes = require('./routes/playerRoutes');
@@ -79,6 +79,11 @@ app.post('/api/admin', (req, res) => {
   } else {
     res.status(401).json({ authenticated: false, error: '用户名或密码错误！' });
   }
+});
+
+app.put('/api/calculateStats', (req, res) => {
+  calculatePlayerStats();
+  calculateElo();
 });
 
 // Mount API routes

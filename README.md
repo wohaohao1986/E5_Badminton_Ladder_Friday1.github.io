@@ -19,9 +19,11 @@ In root directory
 ```bash
 # install required packages
 npm install
+# install PM2 globally
+npm install pm2 -g
 
 # run server
-node ./src/server.js
+pm2 start ./src/server.js
 ```
 
 ## Contributing

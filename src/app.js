@@ -229,14 +229,31 @@ function renderRanking() {
     if (catPlayers.length === 0) return;
     
     html += `<h2 style="color:#4CAF50;margin-top:20px;margin-bottom:15px;">${CATEGORIES[cat]}</h2>`;
+    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;"><thead><tr style="background-color:#f5f5f5;"><th style="padding:10px;text-align:center;border:1px solid #ddd;">排名</th><th style="padding:10px;text-align:left;border:1px solid #ddd;">选手</th><th colspan="3" style="padding:10px;text-align:center;border:1px solid #ddd;background-color:#e8f5e9;">21分制</th><th colspan="3" style="padding:10px;text-align:center;border:1px solid #ddd;background-color:#e3f2fd;">15分制</th><th style="padding:10px;text-align:center;border:1px solid #ddd;">Elo</th><th style="padding:10px;text-align:center;border:1px solid #ddd;">状态</th></tr><tr style="background-color:#f5f5f5;"><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th><th style="padding:5px;text-align:left;border:1px solid #ddd;"></th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">场数</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">胜</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">净分</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">场数</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">胜</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">净分</th><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th></tr></thead><tbody>';
     catPlayers.forEach((p, index) => {
       const statusClass = p.active ? '' : 'player-inactive';
-      html += `<div class="ranking-item ${statusClass}">
-        <span style="font-weight:bold;min-width:40px;">#${index + 1}</span>
-        <span style="flex:1;">${p.name}</span>
-        <span style="color:#666;">${p.active ? '参赛' : '未参赛'}</span>
-      </div>`;
+      const statusText = p.active ? '参赛' : '未参赛';
+      const numberOfMatchesTwentyOne = p.numberOfMatchesTwentyOne || 0;
+      const winsTwentyOne = p.winsTwentyOne || 0;
+      const totalNetScoreTwentyOne = p.totalNetScoreTwentyOne || 0;
+      const numberOfMatchesFifteen = p.numberOfMatchesFifteen || 0;
+      const winsFifteen = p.winsFifteen || 0;
+      const totalNetScoreFifteen = p.totalNetScoreFifteen || 0;
+      const elo = p.elo || 0;
+      html += `<tr class="${statusClass}" style="border-bottom:1px solid #ddd;">
+        <td style="padding:10px;text-align:center;">#${index + 1}</td>
+        <td style="padding:10px;">${p.name}</td>
+        <td style="padding:10px;text-align:center;">${numberOfMatchesTwentyOne}</td>
+        <td style="padding:10px;text-align:center;">${winsTwentyOne}</td>
+        <td style="padding:10px;text-align:center;">${totalNetScoreTwentyOne}</td>
+        <td style="padding:10px;text-align:center;">${numberOfMatchesFifteen}</td>
+        <td style="padding:10px;text-align:center;">${winsFifteen}</td>
+        <td style="padding:10px;text-align:center;">${totalNetScoreFifteen}</td>
+        <td style="padding:10px;text-align:center;">${elo.toFixed(2)}</td>
+        <td style="padding:10px;text-align:center;color:#666;">${statusText}</td>
+      </tr>`;
     });
+    html += '</tbody></table>';
   });
   
   container.innerHTML = html || '<p>暂无选手</p>';
@@ -524,6 +541,12 @@ async function addPlayer() {
     name, 
     active: true,
     category: category,
+    numberOfMatchesTwentyOne: 0,
+    winsTwentyOne: 0,
+    totalNetScoreTwentyOne: 0,
+    numberOfMatchesFifteen: 0,
+    winsFifteen: 0,
+    totalNetScoreFifteen: 0
   };
   
   const response = await addDataToServer('/api/player', newPlayer);
@@ -897,6 +920,12 @@ function promptForAdminCredentials() {
 function hasAnyMatchStarted() {
   const currentMatches = data.matches.filter(m => m.round === data.currentRound);
   return currentMatches.some(m => m.completed);
+}
+
+async function calculatePlayerStats() {
+  await sendAuthenticatedRequest('/api/calculateStats', {});
+  await syncDataFromServer();
+  renderRanking();
 }
 
 // helper to get player name by ID 
