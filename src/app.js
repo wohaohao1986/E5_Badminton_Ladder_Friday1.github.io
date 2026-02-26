@@ -567,23 +567,13 @@ async function deletePlayer(id) {
   }
 
   if (!confirm('确定要删除这名选手吗？')) return;
-  alert('删除选手需要管理员身份：');
-  // prefer server-side deletion when available
+  alert('删除选手需要管理员身份');
   try {
-    const name = prompt('请输入管理员用户名：');
-    const password = prompt('请输入管理员密码：');
-
-    const adminResponse = await addDataToServer('/api/admin/', { adminName: name, adminPassword: password });
-    if (adminResponse && adminResponse.authenticated) {
-      const result = await deleteFromServer('/api/player/', { id: id });
-      alert(result.message);
-      await syncDataFromServer();
-      renderAdmin();
-      renderMatch();
-    } else {
-      alert('管理员验证失败，请检查用户名和密码！');
-      return;
-    }
+    const result = await sendAuthenticatedRequest('/api/player/delete', { id: id });
+    alert(result.message);
+    await syncDataFromServer();
+    renderAdmin();
+    renderMatch();
   } catch (err) {
     console.warn('Server delete failed', err);
   }

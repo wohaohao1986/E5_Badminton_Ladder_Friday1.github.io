@@ -89,8 +89,6 @@ router.put('/', (req, res) => {
       console.log(`[${currentDateTime}] Player ${playersStore.players[playerIndex].name} activated`);
       const catPlayers = playersStore.players.filter(p => p.category === playersStore.players[playerIndex].category && p.active);
       const rankedPlayersInCat = catPlayers.filter(p => typeof p.ranking === 'number');
-      console.log(`Ranked players names in category ${CATEGORIES[playersStore.players[playerIndex].category]}: ${rankedPlayersInCat.map(p => p.name).join(', ')}`);
-      console.log(`[${currentDateTime}] Active players in category ${CATEGORIES[playersStore.players[playerIndex].category]}: ${catPlayers.length}, ranked: ${rankedPlayersInCat.length}`);
       playersStore.players[playerIndex].ranking = rankedPlayersInCat.length + 1;
       playersStore.players[playerIndex].active = true;
       playersStore.matches = removeMatchesInCategory(playersStore.players[playerIndex].category);
@@ -116,8 +114,8 @@ router.put('/', (req, res) => {
   }
 });
 
-// DELETE: Remove a player
-router.delete('/', (req, res) => {
+// Remove a player
+router.put('/delete', (req, res) => {
   const payload = requirePayload(req, res);
   if (!payload) return;
   const playerId = payload.id;
