@@ -597,9 +597,9 @@ async function togglePlayerActive(id) {
   }
 
   const player = data.players.find(p => p.id === id);
-  player.active = !player.active;
+  const newActiveStatus = !player.active;
 
-  const response = await updateDataToServer('/api/player/', { id, active:player.active});
+  const response = await updateDataToServer('/api/player/', { id, active: newActiveStatus });
   alert(response.message);
   await syncDataFromServer();
   renderAdmin();
