@@ -1,6 +1,6 @@
 const CATEGORIES = {
-  tiger: 'Tiger',
-  dragon: 'Dragon'
+  huitailang: '灰太狼',
+  xiyangyang: '喜羊羊'
 };
 
 const SERVER_BASE = (function(){
@@ -229,7 +229,7 @@ function renderRanking() {
     if (catPlayers.length === 0) return;
     
     html += `<h2 style="color:#4CAF50;margin-top:20px;margin-bottom:15px;">${CATEGORIES[cat]}</h2>`;
-    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;"><thead><tr style="background-color:#f5f5f5;"><th style="padding:10px;text-align:center;border:1px solid #ddd;">排名</th><th style="padding:10px;text-align:left;border:1px solid #ddd;">选手</th><th colspan="3" style="padding:10px;text-align:center;border:1px solid #ddd;background-color:#e8f5e9;">21分制</th><th colspan="3" style="padding:10px;text-align:center;border:1px solid #ddd;background-color:#e3f2fd;">15分制</th><th style="padding:10px;text-align:center;border:1px solid #ddd;">Elo</th><th style="padding:10px;text-align:center;border:1px solid #ddd;">状态</th></tr><tr style="background-color:#f5f5f5;"><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th><th style="padding:5px;text-align:left;border:1px solid #ddd;"></th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">场数</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">胜</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">净分</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">场数</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">胜</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">净分</th><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th></tr></thead><tbody>';
+    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;"><thead><tr style="background-color:#f5f5f5;"><th style="padding:10px;text-align:center;border:1px solid #ddd;">排名</th><th style="padding:10px;text-align:left;border:1px solid #ddd;">选手</th><th colspan="3" style="padding:10px;text-align:center;border:1px solid #ddd;background-color:#e8f5e9;">21分制</th><th colspan="3" style="padding:10px;text-align:center;border:1px solid #ddd;background-color:#e3f2fd;">15分制</th><th style="padding:10px;text-align:center;border:1px solid #ddd;">状态</th></tr><tr style="background-color:#f5f5f5;"><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th><th style="padding:5px;text-align:left;border:1px solid #ddd;"></th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">场数</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">胜</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">净分</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">场数</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">胜</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">净分</th><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th></tr></thead><tbody>';
     catPlayers.forEach((p, index) => {
       const statusClass = p.active ? '' : 'player-inactive';
       const statusText = p.active ? '参赛' : '未参赛';
@@ -239,7 +239,6 @@ function renderRanking() {
       const numberOfMatchesFifteen = p.numberOfMatchesFifteen || 0;
       const winsFifteen = p.winsFifteen || 0;
       const totalNetScoreFifteen = p.totalNetScoreFifteen || 0;
-      const elo = p.elo || 0;
       html += `<tr class="${statusClass}" style="border-bottom:1px solid #ddd;">
         <td style="padding:10px;text-align:center;">#${index + 1}</td>
         <td style="padding:10px;">${p.name}</td>
@@ -249,7 +248,6 @@ function renderRanking() {
         <td style="padding:10px;text-align:center;">${numberOfMatchesFifteen}</td>
         <td style="padding:10px;text-align:center;">${winsFifteen}</td>
         <td style="padding:10px;text-align:center;">${totalNetScoreFifteen}</td>
-        <td style="padding:10px;text-align:center;">${elo.toFixed(2)}</td>
         <td style="padding:10px;text-align:center;color:#666;">${statusText}</td>
       </tr>`;
     });
@@ -495,9 +493,9 @@ async function changePlayerCategory(id) {
   const player = data.players.find(p => p.id === id);
   if (!player) return;
   
-  const newCat = prompt(`${player.name} 当前类别：${CATEGORIES[player.category]}\n\n请输入新类别：\n1 - Tiger\n2 - Dragon`);
+  const newCat = prompt(`${player.name} 当前类别：${CATEGORIES[player.category]}\n\n请输入新类别：\n1 - 灰太狼\n2 - 喜羊羊`);
   
-  const catMap = {'1': 'tiger', '2': 'dragon'};
+  const catMap = {'1': 'huitailang', '2': 'xiyangyang'};
   const selectedCat = catMap[newCat];
   
   if (!selectedCat) {

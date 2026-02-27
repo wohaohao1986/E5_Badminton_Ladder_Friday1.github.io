@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const { safeReadJson, safeWriteJson } = require('./utils/fileUtils');
 const { DATA_FILE, ADMIN_CONFIG_FILE } = require('./utils/fileUtils');
-const { currentDateTime, sortPlayersByCategoryAndRanking, generateGroups, generateMatches, finishRound, autoFillScores, calculatePlayerStats, calculateElo } = require('./utils/dataUtils');
+const { currentDateTime, sortPlayersByCategoryAndRanking, generateGroups, generateMatches, finishRound, autoFillScores, calculatePlayerStats } = require('./utils/dataUtils');
 
 // Import route handlers
 const playerRoutes = require('./routes/playerRoutes');
@@ -83,7 +83,6 @@ app.post('/api/admin', (req, res) => {
 
 app.put('/api/calculateStats', (req, res) => {
   calculatePlayerStats();
-  calculateElo();
 });
 
 // Mount API routes

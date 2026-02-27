@@ -1,7 +1,7 @@
 const { DATA_FILE, ADMIN_CONFIG_FILE, safeReadJson, safeWriteJson } = require('./fileUtils');
 const CATEGORIES = {
-  tiger: 'Tiger',
-  dragon: 'Dragon'
+  huitailang: '灰太狼',
+  xiyangyang: '喜羊羊'
 };
 const currentDateTime = new Date().toLocaleString('en-US', {
    year: 'numeric',
@@ -331,17 +331,9 @@ function calculatePlayerStats() {
   safeWriteJson(DATA_FILE, data);
 }
 
-function calculateElo() {
-  const data = loadData();
-  data.players.forEach(player => {
-    player.elo = parseFloat((1000 + (player.winsTwentyOne * 2) + (player.winsFifteen * 1.5) + (player.totalNetScoreTwentyOne * 0.6) + (player.totalNetScoreFifteen * 0.8)).toFixed(2));
-  });
-  safeWriteJson(DATA_FILE, data);
-}
-
 function sortPlayersByCategoryAndRanking() {
   const data = loadData();
-  const categoryOrder = ['tiger', 'dragon'];
+  const categoryOrder = ['huitailang', 'xiyangyang'];
   
   return data.players.sort((a, b) => {
     const catA = categoryOrder.indexOf(a.category);
@@ -411,7 +403,6 @@ module.exports = {
   finishRound,
   autoFillScores,
   calculatePlayerStats,
-  calculateElo,
   loadData,
   getActivePlayers,
   calculateGroupSizes,
