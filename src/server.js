@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const { safeReadJson, safeWriteJson } = require('./utils/fileUtils');
 const { DATA_FILE, ADMIN_CONFIG_FILE } = require('./utils/fileUtils');
-const { currentDateTime, sortPlayersByCategoryAndRanking, generateGroups, generateMatches, finishRound, autoFillScores, calculatePlayerStats } = require('./utils/dataUtils');
+const { currentDateTime, sortPlayersByRanking, generateGroups, generateMatches, finishRound, autoFillScores, calculatePlayerStats, calculateAllPlayerAvgRankInCat } = require('./utils/dataUtils');
 
 // Import route handlers
 const playerRoutes = require('./routes/playerRoutes');
@@ -25,8 +25,7 @@ app.use((req, res, next) => {
 // Endpoint to get main data
 app.get('/api/main', (req, res) => {
   const data = safeReadJson(DATA_FILE, { players: [], groups: [], matches: [], currentRound: 1, roundHistory: [] });
-  data.players = sortPlayersByCategoryAndRanking(data.players);
-  safeWriteJson(DATA_FILE, data); // Ensure players are always sorted in storage
+  sortPlayersByRanking(data.players);
   res.json(data);
 });
 
@@ -56,6 +55,15 @@ app.put('/api/finishRound', (req, res) => {
   try {
     const msg = finishRound();
     res.json({ message: msg });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/calculateAvgRank', (req, res) => {
+  console.log(`[${currentDateTime}] Request to calculate average rank in category for all players`);
+  try {    calculateAllPlayerAvgRankInCat();
+    res.json({ message: 'Average rank in category calculated for all players' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -26,7 +26,8 @@ function getActivePlayers(data, category) {
 // Remove all matches of current round in given category
 function removeMatchesInCategory(category) {
   const data = loadData();
-  return data.matches.filter(m => m.round !== data.currentRound || !m.id.includes(category));
+  data.matches = data.matches.filter(m => m.round !== data.currentRound || !m.id.includes(category));
+  safeWriteJson(DATA_FILE, data);
 }
 
 // Helper: Calculate group sizes for given total
@@ -88,43 +89,33 @@ function generateGroups() {
 }
 
 // Shift ranks in a category after certain operations (e.g., ranking change or deletion)
-function rankShift(playersStore, category, playerIndex, rank, isActive) {
-  if (playerIndex !== null) {
-    let categoryPlayers = playersStore.players
-      .filter(p => p.category === category && p.active)
-      .sort((a, b) => {
-        const rankA = typeof a.ranking === 'number' ? a.ranking : Infinity;
-        const rankB = typeof b.ranking === 'number' ? b.ranking : Infinity;
-        return rankA - rankB;
-      });
-    
-    if (rank !== null) {
-      const currentRank = playersStore.players[playerIndex].ranking;
-      categoryPlayers.splice(currentRank - 1, 1);
-      categoryPlayers.splice(rank - 1, 0, playersStore.players[playerIndex]);
-    }
-    
-    if (isActive === false) {
-      playersStore.players[playerIndex].ranking = '-';
-      categoryPlayers = categoryPlayers.filter(p => p.id !== playersStore.players[playerIndex].id);
-    }
-    
-    // Reassign rankings
-    categoryPlayers.forEach(p => {
-      const globalIndex = playersStore.players.findIndex(pl => pl.id === p.id);
-      playersStore.players[globalIndex].ranking = categoryPlayers.indexOf(p) + 1;
-    });
-  } else if (category !== null) {
-    // Re-rank all players in the category
-    const categoryPlayers = playersStore.players
-      .filter(p => p.category === category && p.active)
-      .sort((a, b) => a.ranking - b.ranking);
-    
-    categoryPlayers.forEach((p, index) => {
-      const globalIndex = playersStore.players.findIndex(pl => pl.id === p.id);
-      playersStore.players[globalIndex].ranking = index + 1;
-    });
+function rerankPlayer(playerIndex, rank, isActive) {
+  const data = loadData();
+  if (playerIndex === -1) return;
+  const player = data.players[playerIndex];
+  if (rank !== null) {
+    const curr = player.ranking;
+    player.ranking = rank;
+    data.players.splice(curr - 1, 1);
+    data.players.splice(rank - 1, 0, player);
   }
+  if (isActive !== null) {
+    player.active = isActive;
+    if (isActive) {
+      const playersSortedByAvg = data.players.filter(p => p.active && p.category === player.category).sort((a, b) => a.avgRankInCat - b.avgRankInCat);
+      const avgRankIndex = playersSortedByAvg.findIndex(p => p.id === player.id);
+      if (avgRankIndex !== -1 && avgRankIndex !== 0) {
+        const rankOfPlayerAhead = playersSortedByAvg[avgRankIndex - 1].ranking;
+        player.ranking = rankOfPlayerAhead + 1;
+        data.players.splice(data.players.findIndex(p => p.id === player.id), 1);
+        data.players.splice(data.players.findIndex(p => p.ranking === rankOfPlayerAhead) + 1, 0, player);
+      }
+    } else {
+      data.players[playerIndex].ranking = '-';
+    }
+  }
+  safeWriteJson(DATA_FILE, data);
+  sortPlayersByRanking();
 }
 
 // Generate round-robin matches for all groups
@@ -269,7 +260,7 @@ function finishRound() {
   data.groups.length = 0;
   data.currentRound++;
   safeWriteJson(DATA_FILE, data);
-  
+  calculateAllPlayerAvgRankInCat();
   let msg = '本轮比赛结束，升降名次详情如下：\n';
   msg += Object.values(categoryMessages).join('');
   msg += '请截图保存本轮升降名次详情以备查阅！';
@@ -330,12 +321,59 @@ function calculatePlayerStats() {
   // Step 4: Write the updated data back to the file
   safeWriteJson(DATA_FILE, data);
 }
+function calculatePlayerAvgRankInCat(playerName) {
+  const data = loadData();
+  const player = data.players.find(p => p.name === playerName);
+  
+  if (!player) return;
+  
+  player.avgRankInCat = 0;
+  player.roundPlayed = 0;
+  
+  let ranks = [];
+  data.roundHistory.forEach(round => {
+    const ranking = round.rankings.find(r => r.name === playerName);
+    if (!ranking || ranking.category !== player.category) return;
+    
+    let playerRankIndex = round.rankings.filter(r => r.category === player.category).findIndex(r => r.name === playerName);
+    let playerRank = playerRankIndex + 1;
+    
+    if (ranking.change === 'promoted') playerRank -= 1;
+    else if (ranking.change === 'relegated') playerRank += 1;
+    
+    ranks.push(playerRank);
+    player.roundPlayed += 1;
+  });
+  
+  if (player.roundPlayed > 0) {
+    player.avgRankInCat = parseFloat((ranks.reduce((sum, r) => sum + r, 0) / player.roundPlayed).toFixed(2));
+  } 
+  else if (player.roundPlayed > 10) {
+    // only calculate most recent 10 rounds
+    const recentRanks = ranks.slice(-10);
+    player.avgRankInCat = parseFloat((recentRanks.reduce((sum, r) => sum + r, 0) / recentRanks.length).toFixed(2));
+  }
+  else {
+    player.avgRankInCat = '-';
+  }
+  
+  data.players.find(p => p.name === playerName).avgRankInCat = player.avgRankInCat;
+  data.players.find(p => p.name === playerName).roundPlayed = player.roundPlayed;
+  safeWriteJson(DATA_FILE, data);
+}
 
-function sortPlayersByCategoryAndRanking() {
+function calculateAllPlayerAvgRankInCat() {
+  const data = loadData();
+  data.players.forEach(player => {
+    calculatePlayerAvgRankInCat(player.name);
+  });
+}
+
+function sortPlayersByRanking() {
   const data = loadData();
   const categoryOrder = ['huitailang', 'xiyangyang'];
   
-  return data.players.sort((a, b) => {
+  data.players = data.players.sort((a, b) => {
     const catA = categoryOrder.indexOf(a.category);
     const catB = categoryOrder.indexOf(b.category);
     if (catA !== catB) return catA - catB;
@@ -344,6 +382,16 @@ function sortPlayersByCategoryAndRanking() {
     const rankB = typeof b.ranking === 'number' ? b.ranking : Infinity;
     return rankA - rankB;
   });
+  Object.keys(CATEGORIES).forEach(cat => {
+    const catPlayers = data.players.filter(p => p.category === cat && p.active);
+    catPlayers.forEach((p, index) => {
+      const playerIndex = data.players.findIndex(player => player.id === p.id);
+      if (playerIndex !== -1) {
+        data.players[playerIndex].ranking = index + 1;
+      }
+    });
+  });
+  safeWriteJson(DATA_FILE, data);
 }
 
 // Helper: Compare two players to determine ranks in group
@@ -396,10 +444,10 @@ module.exports = {
   CATEGORIES,
   currentDateTime,
   removeMatchesInCategory,
-  sortPlayersByCategoryAndRanking,
+  sortPlayersByRanking,
   generateGroups,
   generateMatches,
-  rankShift,
+  rerankPlayer,
   finishRound,
   autoFillScores,
   calculatePlayerStats,
@@ -407,6 +455,8 @@ module.exports = {
   getActivePlayers,
   calculateGroupSizes,
   generateRandomScore,
-  generateRoundRobinMatches
+  generateRoundRobinMatches,
+  calculatePlayerAvgRankInCat,
+  calculateAllPlayerAvgRankInCat
 };
 

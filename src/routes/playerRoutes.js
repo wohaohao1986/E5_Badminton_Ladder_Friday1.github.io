@@ -1,6 +1,6 @@
 const express = require('express');
 const { DATA_FILE, safeReadJson, safeWriteJson } = require('../utils/fileUtils');
-const { CATEGORIES, currentDateTime, removeMatchesInCategory, rankShift } = require('../utils/dataUtils');
+const { CATEGORIES, currentDateTime, rerankPlayer, sortPlayersByRanking, calculatePlayerAvgRankInCat } = require('../utils/dataUtils');
 const router = express.Router();
 
 // Helper: load and init store
@@ -68,18 +68,21 @@ router.put('/', (req, res) => {
     if (currentPlayer.active) {
       playersStore.players[playerIndex].ranking = playersStore.players.filter(p => p.category === payload.category && p.active).length;
     }
-    cleanupCategories(playersStore, oldCategory, payload.category);
-    msg += `选手${playersStore.players[playerIndex].name}已从${CATEGORIES[oldCategory]}移至${CATEGORIES[payload.category]}分组\n`;
+    changePlayerCategory(playerIndex, payload.category);
+    cleanupCategories(oldCategory, payload.category);
+    let newPlayer = loadStore().players.find(p => p.id === payload.id);
+    msg += `选手${newPlayer.name}已从${CATEGORIES[oldCategory]}移至${CATEGORIES[payload.category]}分组\n`;
+    msg += `平均排名为${newPlayer.avgRankInCat}，现排在第${newPlayer.ranking}名\n`;
     msg += `请重新生成${CATEGORIES[oldCategory]}和${CATEGORIES[payload.category]}分组\n`;
-    msg += checkAndPromptGroupingMessage(oldCategory, playersStore);
-    msg += checkAndPromptGroupingMessage(payload.category, playersStore);
+    msg += checkAndPromptGroupingMessage(oldCategory);
+    msg += checkAndPromptGroupingMessage(payload.category);
   }
 
   // Ranking change
   if ('ranking' in payload) {
     console.log(`[${currentDateTime}] Player ${playersStore.players[playerIndex].name}, ranking changed to ${payload.ranking}`);
-    rankShift(playersStore, playersStore.players[playerIndex].category, playerIndex, payload.ranking, null);
-    cleanupCategories(playersStore, playersStore.players[playerIndex].category);
+    rerankPlayer(playerIndex, payload.ranking, null);
+    cleanupCategories(playersStore.players[playerIndex].category);
     msg += `${playersStore.players[playerIndex].name} 已调整为第 ${payload.ranking} 名！`;
   }
 
@@ -87,25 +90,17 @@ router.put('/', (req, res) => {
   if ('active' in payload) {
     if (payload.active === true) {
       console.log(`[${currentDateTime}] Player ${playersStore.players[playerIndex].name} activated`);
-      const catPlayers = playersStore.players.filter(p => p.category === playersStore.players[playerIndex].category && p.active);
-      const rankedPlayersInCat = catPlayers.filter(p => typeof p.ranking === 'number');
-      playersStore.players[playerIndex].ranking = rankedPlayersInCat.length + 1;
-      playersStore.players[playerIndex].active = true;
-      playersStore.matches = removeMatchesInCategory(playersStore.players[playerIndex].category);
       console.log(`[${currentDateTime}] Player activated in category ${playersStore.players[playerIndex].category}`);
-      msg = checkAndPromptGroupingMessage(playersStore.players[playerIndex].category, playersStore);
+      msg = `选手${playersStore.players[playerIndex].name}平均排名为${playersStore.players[playerIndex].avgRankInCat}，现排在第${playersStore.players[playerIndex].ranking}名\n`;
     } else {
       console.log(`[${currentDateTime}] Player ${playersStore.players[playerIndex].name} deactivated`);
-      playersStore.players[playerIndex].ranking = '-';
-      playersStore.players[playerIndex].active = false;
-      msg = `选手${playersStore.players[playerIndex].name}已被设为不活跃，无法参加比赛\n`;
-      msg += `请重新生成${CATEGORIES[playersStore.players[playerIndex].category]}分组`;
-      rankShift(playersStore, playersStore.players[playerIndex].category, playerIndex, null, false);
-      cleanupCategories(playersStore, playersStore.players[playerIndex].category);
+      msg = `选手${playersStore.players[playerIndex].name}已被设为不活跃\n`;
     }
+    rerankPlayer(playerIndex, null, payload.active);
+    cleanupCategories(playersStore.players[playerIndex].category);
+    msg += checkAndPromptGroupingMessage(playersStore.players[playerIndex].category);
   }
 
-  saveStore(playersStore);
   console.log(`[${currentDateTime}] Player updated successfully`);
   if (msg && msg.length > 0) {
     res.status(201).json({ message: msg });
@@ -126,25 +121,37 @@ router.put('/delete', (req, res) => {
   if (!player) return res.status(404).json({ error: 'Player not found' });
 
   playersStore.players = playersStore.players.filter(p => p.id !== playerId);
-  // Re-rank, remove groups/matches
-  cleanupCategories(playersStore, player.category);
-  const msg = `选手${player.name}已被删除\n请重新生成${CATEGORIES[player.category]}分组`;
   saveStore(playersStore);
+
+  // Re-rank, remove groups/matches
+  cleanupCategories(player.category);
+  sortPlayersByRanking();
   console.log(`[${currentDateTime}] Player ${player.name} deleted successfully`);
+  const msg = `选手${player.name}已被删除\n请重新生成${CATEGORIES[player.category]}分组`;
   res.status(201).json({ message: msg });
 });
 
 // Helper: common cleanup after category changes
-function cleanupCategories(store, ...categories) {
-  categories.forEach(cat => {
-    rankShift(store, cat, null, null, null);
-    removeGroupContainsPlayer(cat, store);
-    store.matches = removeMatchesInCategory(cat);
+function cleanupCategories(...categories) {
+  const data = loadStore();
+  categories.forEach(category => {
+    data.matches = data.matches.filter(m => !m.id.includes(category));
+    data.groups = data.groups.filter(g => g.category !== category);
   });
+  saveStore(data);
+}
+
+function changePlayerCategory(playerIndex, newCategory) {
+  const data = loadStore();
+  data.players[playerIndex].category = newCategory;
+  saveStore(data);
+  calculatePlayerAvgRankInCat(data.players[playerIndex].name);
+  rerankPlayer(playerIndex, null, data.players[playerIndex].active);
 }
 
 // Helper function to check category counts
-function checkAndPromptGroupingMessage(category, playersStore) {
+function checkAndPromptGroupingMessage(category) {
+  const playersStore = loadStore();
   const activePlayers = playersStore.players.filter(p => p.active && p.category === category);
   const total = activePlayers.length;
 
@@ -160,14 +167,6 @@ function checkAndPromptGroupingMessage(category, playersStore) {
     message = `${CATEGORIES[category]}现有${total}人参赛\n可以生成分组了，请在分组管理中点击“生成本轮分组”按钮`;
   }
   return message;
-}
-
-// Remove all groups in deactivated player's category
-// Returns a new groups array without the groups containing the deactivated player
-function removeGroupContainsPlayer(category, playersStore) {
-  if (playersStore.groups.length !== 0)
-    playersStore.groups = playersStore.groups.filter(g => g.category !== category);
-  return playersStore.groups;
 }
 
 module.exports = router;
