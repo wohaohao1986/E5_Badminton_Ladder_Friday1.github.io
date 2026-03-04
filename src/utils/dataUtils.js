@@ -89,15 +89,26 @@ function generateGroups() {
 }
 
 // Shift ranks in a category after certain operations (e.g., ranking change or deletion)
-function rerankPlayer(playerIndex, rank, isActive) {
+function rerankPlayer(playerIndex, rank, isActive, isCategoryChange = false) {
   const data = loadData();
   if (playerIndex === -1) return;
   const player = data.players[playerIndex];
   if (rank !== null) {
-    const curr = player.ranking;
     player.ranking = rank;
-    data.players.splice(curr - 1, 1);
-    data.players.splice(rank - 1, 0, player);
+    // Find the actual index of the player in the array
+    const actualIndex = data.players.findIndex(p => p.id === player.id);
+    // Remove the player from current position
+    if (actualIndex !== -1) {
+      data.players.splice(actualIndex, 1);
+    }
+    // Find correct insertion position: after all players in same category with lower rank
+    let insertIndex = 0;
+    for (let i = 0; i < data.players.length; i++) {
+      if (data.players[i].category === player.category && data.players[i].ranking < rank) {
+        insertIndex = i + 1;
+      }
+    }
+    data.players.splice(insertIndex, 0, player);
   }
   if (isActive !== null) {
     player.active = isActive;
@@ -107,8 +118,9 @@ function rerankPlayer(playerIndex, rank, isActive) {
       const activePlayersInCat = data.players.filter(p => p.active && p.category === player.category);
       
       let targetRank = Math.ceil(player.avgRankInCat);
-      
-      if (lastRoundRanking && lastRoundRanking.length > 0) {
+      console.log(`Initial target rank for player ${player.name} in category ${CATEGORIES[player.category]} based on avgRankInCat ${player.avgRankInCat} is ${targetRank}`);
+      // Only use last round matching if avgRankInCat is within the last round size
+      if (lastRoundRanking && lastRoundRanking.length > 0 && typeof player.avgRankInCat === 'number' && Math.floor(player.avgRankInCat) <= lastRoundRanking.length) {
         const floorPos = Math.floor(player.avgRankInCat) - 1; // 0-indexed position in last round list
         const ceilPos = Math.ceil(player.avgRankInCat) - 1;   // 0-indexed position in last round list
         
@@ -120,15 +132,22 @@ function rerankPlayer(playerIndex, rank, isActive) {
         const floorPlayer = floorPlayerName ? activePlayersInCat.find(p => p.name === floorPlayerName) : null;
         const ceilPlayer = ceilPlayerName ? activePlayersInCat.find(p => p.name === ceilPlayerName) : null;
         
+        console.log(`For player ${player.name}, floor player in last round is ${floorPlayerName} (${floorPlayer ? 'active' : 'inactive'}), ceil player in last round is ${ceilPlayerName} (${ceilPlayer ? 'active' : 'inactive'})`);
+        
+        // If both floor and ceil players are the same as current player, just set rank to avgRankInCat
+        if (floorPlayer && ceilPlayer && floorPlayer.id === player.id && ceilPlayer.id === player.id) {
+          targetRank = Math.ceil(player.avgRankInCat);
+          console.log(`Floor and ceil players are same as current player ${player.name}, setting rank to ${targetRank}`);
+        }
         // Determine target rank based on which players exist
-        if (floorPlayer && ceilPlayer) {
+        else if (floorPlayer && ceilPlayer) {
           // Both exist, position between them
           const minRank = Math.min(floorPlayer.ranking, ceilPlayer.ranking);
           const maxRank = Math.max(floorPlayer.ranking, ceilPlayer.ranking);
           targetRank = minRank + 1;
           // Ensure we're properly positioned between them
           if (targetRank >= maxRank) {
-            targetRank = maxRank - 1;
+            targetRank = minRank;
           }
         } else if (floorPlayer) {
           // Only floor exists, position right after
@@ -183,75 +202,60 @@ function rerankPlayer(playerIndex, rank, isActive) {
             // Only closest ceil exists
             targetRank = closestCeil.ranking;
           } else {
-            // Fallback - position at calculated rank
+            // Fallback - position at calculated avgRankInCat
             targetRank = Math.ceil(player.avgRankInCat);
           }
         }
       }
-      
+      console.log(`Calculated target rank for player ${player.name} in category ${CATEGORIES[player.category]} is ${targetRank} based on avgRankInCat ${player.avgRankInCat}`);
       // Ensure targetRank is within valid range
       targetRank = Math.max(1, Math.min(targetRank, activePlayersInCat.length + 1));
       player.ranking = targetRank;
       player.returnCurrentRound = true;
       
-      // Step 2: Adjust rank by comparing with adjacent returned players
-      let currentRank = player.ranking;
-      let adjusted = true;
-      
-      while (adjusted) {
-        adjusted = false;
+      // Step 2: Adjust rank by comparing with adjacent returned players (skip for category changes)
+      if (!isCategoryChange) {
+        let currentRank = player.ranking;
+        let adjusted = true;
         
-        // Check left neighbor (rank = currentRank - 1)
-        if (currentRank > 1) {
-          const leftNeighbor = activePlayersInCat.find(p => p.ranking === currentRank - 1);
-          if (leftNeighbor && leftNeighbor.returnCurrentRound) {
-            // Left neighbor also returned, compare avgRanks
-            // Smaller avgRank is better, so if left neighbor has worse (larger) avgRank, move current up
-            if (leftNeighbor.avgRankInCat > player.avgRankInCat) {
-              currentRank--;
-              adjusted = true;
+        while (adjusted) {
+          adjusted = false;
+          
+          // Check left neighbor (rank = currentRank - 1)
+          if (currentRank > 1) {
+            const leftNeighbor = activePlayersInCat.find(p => p.ranking === currentRank - 1);
+            if (leftNeighbor && leftNeighbor.returnCurrentRound) {
+              // Left neighbor also returned, compare avgRanks
+              // Smaller avgRank is better, so if left neighbor has worse (larger) avgRank, move current up
+              if (leftNeighbor.avgRankInCat > player.avgRankInCat) {
+                currentRank--;
+                adjusted = true;
+              }
+            }
+          }
+          
+          // Check right neighbor (rank = currentRank + 1)
+          if (!adjusted && currentRank < activePlayersInCat.length) {
+            const rightNeighbor = activePlayersInCat.find(p => p.ranking === currentRank + 1);
+            if (rightNeighbor && rightNeighbor.returnCurrentRound) {
+              // Right neighbor also returned, compare avgRanks
+              // If right neighbor has better (smaller) avgRank, move current down
+              if (rightNeighbor.avgRankInCat < player.avgRankInCat) {
+                currentRank++;
+                adjusted = true;
+              }
             }
           }
         }
         
-        // Check right neighbor (rank = currentRank + 1)
-        if (!adjusted && currentRank < activePlayersInCat.length) {
-          const rightNeighbor = activePlayersInCat.find(p => p.ranking === currentRank + 1);
-          if (rightNeighbor && rightNeighbor.returnCurrentRound) {
-            // Right neighbor also returned, compare avgRanks
-            // If right neighbor has better (smaller) avgRank, move current down
-            if (rightNeighbor.avgRankInCat < player.avgRankInCat) {
-              currentRank++;
-              adjusted = true;
-            }
-          }
-        }
+        player.ranking = currentRank;
+        console.log(`Adjusted target rank for player ${player.name} in category ${CATEGORIES[player.category]} is ${player.ranking} after comparing with adjacent returned players`);
       }
-      
-      player.ranking = currentRank;
     } else {
       data.players[playerIndex].ranking = '-';
     }
   }
   safeWriteJson(DATA_FILE, data);
-  // Ensure all active players in the category are properly ranked by avgRankInCat
-  if (isActive) {
-    const cat = player.category;
-    const catActivePlayers = data.players.filter(p => p.category === cat && p.active);
-    // Sort active players by avgRankInCat, then reassign rankings
-    catActivePlayers.sort((a, b) => {
-      const avgA = typeof a.avgRankInCat === 'number' ? a.avgRankInCat : Infinity;
-      const avgB = typeof b.avgRankInCat === 'number' ? b.avgRankInCat : Infinity;
-      return avgA - avgB;
-    });
-    catActivePlayers.forEach((p, index) => {
-      const playerIndex = data.players.findIndex(player => player.id === p.id);
-      if (playerIndex !== -1) {
-        data.players[playerIndex].ranking = index + 1;
-      }
-    });
-    safeWriteJson(DATA_FILE, data);
-  }
   sortPlayersByRanking();
 }
 
@@ -273,7 +277,11 @@ function getLastRoundRankingInCategory(category) {
       i++;
     }
   }
-  return lastRoundRanking;
+
+  // Remove players who is not currently active in this category
+  const activePlayersInCat = data.players.filter(p => p.active && p.category === category);
+  const filteredLastRoundRanking = lastRoundRanking.filter(r => activePlayersInCat.some(p => p.name === r.name));
+  return filteredLastRoundRanking;
 }
 
 // Generate round-robin matches for all groups
@@ -537,10 +545,17 @@ function sortPlayersByRanking() {
     const catB = categoryOrder.indexOf(b.category);
     if (catA !== catB) return catA - catB;
     
+    // Sort active players before inactive ones
+    const activeA = a.active ? 0 : 1;
+    const activeB = b.active ? 0 : 1;
+    if (activeA !== activeB) return activeA - activeB;
+    
     const rankA = typeof a.ranking === 'number' ? a.ranking : Infinity;
     const rankB = typeof b.ranking === 'number' ? b.ranking : Infinity;
     return rankA - rankB;
   });
+  
+  // Reassign rankings to ensure sequential order for active players
   Object.keys(CATEGORIES).forEach(cat => {
     const catPlayers = data.players.filter(p => p.category === cat && p.active);
     catPlayers.forEach((p, index) => {

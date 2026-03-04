@@ -105,7 +105,7 @@ router.put('/', (req, res) => {
     // Reload store after rerankPlayer modifies data on disk
     const updatedStore = loadStore();
     const updatedPlayer = updatedStore.players.find(p => p.id === payload.id);
-    msg += `，现排在第 ${updatedPlayer.ranking} 名！`;
+    msg += `现排在第 ${updatedPlayer.ranking} 名！`;
     msg += checkAndPromptGroupingMessage(playerCategory);
   }
 
@@ -154,7 +154,7 @@ function changePlayerCategory(playerIndex, newCategory) {
   data.players[playerIndex].category = newCategory;
   saveStore(data);
   calculatePlayerAvgRankInCat(data.players[playerIndex].name);
-  rerankPlayer(playerIndex, null, data.players[playerIndex].active);
+  rerankPlayer(playerIndex, null, data.players[playerIndex].active, true);
 }
 
 // Helper function to check category counts
