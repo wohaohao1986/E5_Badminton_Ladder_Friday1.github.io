@@ -102,20 +102,178 @@ function rerankPlayer(playerIndex, rank, isActive) {
   if (isActive !== null) {
     player.active = isActive;
     if (isActive) {
-      const playersSortedByAvg = data.players.filter(p => p.active && p.category === player.category).sort((a, b) => a.avgRankInCat - b.avgRankInCat);
-      const avgRankIndex = playersSortedByAvg.findIndex(p => p.id === player.id);
-      if (avgRankIndex !== -1 && avgRankIndex !== 0) {
-        const rankOfPlayerAhead = playersSortedByAvg[avgRankIndex - 1].ranking;
-        player.ranking = rankOfPlayerAhead + 1;
-        data.players.splice(data.players.findIndex(p => p.id === player.id), 1);
-        data.players.splice(data.players.findIndex(p => p.ranking === rankOfPlayerAhead) + 1, 0, player);
+      // Step 1: Get last round ranking and determine initial position based on avgRankInCat
+      const lastRoundRanking = getLastRoundRankingInCategory(player.category);
+      const activePlayersInCat = data.players.filter(p => p.active && p.category === player.category);
+      
+      let targetRank = Math.ceil(player.avgRankInCat);
+      
+      if (lastRoundRanking && lastRoundRanking.length > 0) {
+        const floorPos = Math.floor(player.avgRankInCat) - 1; // 0-indexed position in last round list
+        const ceilPos = Math.ceil(player.avgRankInCat) - 1;   // 0-indexed position in last round list
+        
+        // Get the player names who were at floor and ceil positions in last round
+        const floorPlayerName = floorPos >= 0 && floorPos < lastRoundRanking.length ? lastRoundRanking[floorPos].name : null;
+        const ceilPlayerName = ceilPos >= 0 && ceilPos < lastRoundRanking.length ? lastRoundRanking[ceilPos].name : null;
+        
+        // Find these players in current active list
+        const floorPlayer = floorPlayerName ? activePlayersInCat.find(p => p.name === floorPlayerName) : null;
+        const ceilPlayer = ceilPlayerName ? activePlayersInCat.find(p => p.name === ceilPlayerName) : null;
+        
+        // Determine target rank based on which players exist
+        if (floorPlayer && ceilPlayer) {
+          // Both exist, position between them
+          const minRank = Math.min(floorPlayer.ranking, ceilPlayer.ranking);
+          const maxRank = Math.max(floorPlayer.ranking, ceilPlayer.ranking);
+          targetRank = minRank + 1;
+          // Ensure we're properly positioned between them
+          if (targetRank >= maxRank) {
+            targetRank = maxRank - 1;
+          }
+        } else if (floorPlayer) {
+          // Only floor exists, position right after
+          targetRank = floorPlayer.ranking + 1;
+        } else if (ceilPlayer) {
+          // Only ceil exists, position at or above ceil player
+          targetRank = ceilPlayer.ranking;
+        } else {
+          // Neither exists, find closest active players from last round rankings
+          let closestFloor = null;
+          let closestFloorPos = -1;
+          
+          // Search backward from floor position
+          for (let i = floorPos; i >= 0; i--) {
+            const playerName = lastRoundRanking[i].name;
+            const candidate = activePlayersInCat.find(p => p.name === playerName);
+            if (candidate) {
+              closestFloor = candidate;
+              closestFloorPos = i;
+              break;
+            }
+          }
+          
+          let closestCeil = null;
+          let closestCeilPos = lastRoundRanking.length;
+          
+          // Search forward from ceil position
+          for (let i = ceilPos; i < lastRoundRanking.length; i++) {
+            const playerName = lastRoundRanking[i].name;
+            const candidate = activePlayersInCat.find(p => p.name === playerName);
+            if (candidate) {
+              closestCeil = candidate;
+              closestCeilPos = i;
+              break;
+            }
+          }
+          
+          if (closestFloor && closestCeil) {
+            // Position between closest floor and ceil
+            const minRank = Math.min(closestFloor.ranking, closestCeil.ranking);
+            const maxRank = Math.max(closestFloor.ranking, closestCeil.ranking);
+            // Position right after the better-ranked player (closer to floor)
+            targetRank = minRank + 1;
+            // Ensure we're properly positioned between them
+            if (targetRank >= maxRank) {
+              targetRank = maxRank - 1;
+            }
+          } else if (closestFloor) {
+            // Only closest floor exists
+            targetRank = closestFloor.ranking + 1;
+          } else if (closestCeil) {
+            // Only closest ceil exists
+            targetRank = closestCeil.ranking;
+          } else {
+            // Fallback - position at calculated rank
+            targetRank = Math.ceil(player.avgRankInCat);
+          }
+        }
       }
+      
+      // Ensure targetRank is within valid range
+      targetRank = Math.max(1, Math.min(targetRank, activePlayersInCat.length + 1));
+      player.ranking = targetRank;
+      player.returnCurrentRound = true;
+      
+      // Step 2: Adjust rank by comparing with adjacent returned players
+      let currentRank = player.ranking;
+      let adjusted = true;
+      
+      while (adjusted) {
+        adjusted = false;
+        
+        // Check left neighbor (rank = currentRank - 1)
+        if (currentRank > 1) {
+          const leftNeighbor = activePlayersInCat.find(p => p.ranking === currentRank - 1);
+          if (leftNeighbor && leftNeighbor.returnCurrentRound) {
+            // Left neighbor also returned, compare avgRanks
+            // Smaller avgRank is better, so if left neighbor has worse (larger) avgRank, move current up
+            if (leftNeighbor.avgRankInCat > player.avgRankInCat) {
+              currentRank--;
+              adjusted = true;
+            }
+          }
+        }
+        
+        // Check right neighbor (rank = currentRank + 1)
+        if (!adjusted && currentRank < activePlayersInCat.length) {
+          const rightNeighbor = activePlayersInCat.find(p => p.ranking === currentRank + 1);
+          if (rightNeighbor && rightNeighbor.returnCurrentRound) {
+            // Right neighbor also returned, compare avgRanks
+            // If right neighbor has better (smaller) avgRank, move current down
+            if (rightNeighbor.avgRankInCat < player.avgRankInCat) {
+              currentRank++;
+              adjusted = true;
+            }
+          }
+        }
+      }
+      
+      player.ranking = currentRank;
     } else {
       data.players[playerIndex].ranking = '-';
     }
   }
   safeWriteJson(DATA_FILE, data);
+  // Ensure all active players in the category are properly ranked by avgRankInCat
+  if (isActive) {
+    const cat = player.category;
+    const catActivePlayers = data.players.filter(p => p.category === cat && p.active);
+    // Sort active players by avgRankInCat, then reassign rankings
+    catActivePlayers.sort((a, b) => {
+      const avgA = typeof a.avgRankInCat === 'number' ? a.avgRankInCat : Infinity;
+      const avgB = typeof b.avgRankInCat === 'number' ? b.avgRankInCat : Infinity;
+      return avgA - avgB;
+    });
+    catActivePlayers.forEach((p, index) => {
+      const playerIndex = data.players.findIndex(player => player.id === p.id);
+      if (playerIndex !== -1) {
+        data.players[playerIndex].ranking = index + 1;
+      }
+    });
+    safeWriteJson(DATA_FILE, data);
+  }
   sortPlayersByRanking();
+}
+
+function getLastRoundRankingInCategory(category) {
+  const data = loadData();
+  const lastRound = data.roundHistory.length > 0 ? data.roundHistory[data.roundHistory.length - 1] : null;
+  if (!lastRound) return null;
+  const lastRoundRanking = lastRound.rankings.filter(r => r.category === category);
+  
+  // Swap adjacent relegated and promoted pairs
+  for (let i = 0; i < lastRoundRanking.length - 1; i++) {
+    const current = lastRoundRanking[i];
+    const next = lastRoundRanking[i + 1];
+    
+    // If current is relegated and next is promoted, swap them
+    if (current.change === 'relegated' && next.change === 'promoted') {
+      [lastRoundRanking[i], lastRoundRanking[i + 1]] = [lastRoundRanking[i + 1], lastRoundRanking[i]];
+      // Continue from next position since we just swapped
+      i++;
+    }
+  }
+  return lastRoundRanking;
 }
 
 // Generate round-robin matches for all groups
@@ -229,6 +387,7 @@ function finishRound() {
   
   // Update each player's stats with matches from this round
   data.players.forEach(player => {
+    player.returnCurrentRound = false; // reset returnCurrentRound flag after processing stats
     const playerMatches = currentRoundMatches.filter(m => m.completed && (m.team1.includes(player.id) || m.team2.includes(player.id)));
     if (playerMatches.length > 0) {
       // Separate into 21-point and 15-point matches

@@ -35,6 +35,7 @@ router.post('/', (req, res) => {
     const catPlayers = playersStore.players.filter(p => p.category === newP.category && p.active);
     const rankedPlayersInCat = catPlayers.filter(p => typeof p.ranking === 'number');
     newP.ranking = rankedPlayersInCat.length + 1; // set rank to last
+    newP.returnCurrentRound = false; // default to false
     playersStore.players.push(newP);
     console.log(`[${currentDateTime}] Request to Add a new player, name: ${newP.name}, category: ${CATEGORIES[newP.category]}`);
     const message = checkAndPromptGroupingMessage(newP.category, playersStore);
@@ -63,16 +64,13 @@ router.put('/', (req, res) => {
   // Category change
   if ('category' in payload) {
     const oldCategory = currentPlayer.category;
-    console.log(`[${currentDateTime}] Player ${currentPlayer.name}, category changed from ${CATEGORIES[oldCategory]} to ${CATEGORIES[payload.category]}`);
-    playersStore.players[playerIndex].category = payload.category;
-    if (currentPlayer.active) {
-      playersStore.players[playerIndex].ranking = playersStore.players.filter(p => p.category === payload.category && p.active).length;
-    }
+    const playerName = currentPlayer.name;
+    console.log(`[${currentDateTime}] Player ${playerName}, category changed from ${CATEGORIES[oldCategory]} to ${CATEGORIES[payload.category]}`);
     changePlayerCategory(playerIndex, payload.category);
     cleanupCategories(oldCategory, payload.category);
-    let newPlayer = loadStore().players.find(p => p.id === payload.id);
-    msg += `选手${newPlayer.name}已从${CATEGORIES[oldCategory]}移至${CATEGORIES[payload.category]}分组\n`;
-    msg += `平均排名为${newPlayer.avgRankInCat}，现排在第${newPlayer.ranking}名\n`;
+    let updatedPlayer = loadStore().players.find(p => p.id === payload.id);
+    msg += `选手${updatedPlayer.name}已从${CATEGORIES[oldCategory]}移至${CATEGORIES[payload.category]}分组\n`;
+    msg += `平均排名为${updatedPlayer.avgRankInCat}，现排在第${updatedPlayer.ranking}名\n`;
     msg += `请重新生成${CATEGORIES[oldCategory]}和${CATEGORIES[payload.category]}分组\n`;
     msg += checkAndPromptGroupingMessage(oldCategory);
     msg += checkAndPromptGroupingMessage(payload.category);
@@ -81,24 +79,34 @@ router.put('/', (req, res) => {
   // Ranking change
   if ('ranking' in payload) {
     console.log(`[${currentDateTime}] Player ${playersStore.players[playerIndex].name}, ranking changed to ${payload.ranking}`);
+    const playerName = playersStore.players[playerIndex].name;
+    const playerCategory = playersStore.players[playerIndex].category;
     rerankPlayer(playerIndex, payload.ranking, null);
-    cleanupCategories(playersStore.players[playerIndex].category);
-    msg += `${playersStore.players[playerIndex].name} 已调整为第 ${payload.ranking} 名！`;
+    cleanupCategories(playerCategory);
+    msg += `${playerName} 已调整为第 ${payload.ranking} 名！`;
   }
 
   // Active status change
   if ('active' in payload) {
+    const playerName = playersStore.players[playerIndex].name;
+    const playerCategory = playersStore.players[playerIndex].category;
+    
     if (payload.active === true) {
-      console.log(`[${currentDateTime}] Player ${playersStore.players[playerIndex].name} activated`);
-      console.log(`[${currentDateTime}] Player activated in category ${playersStore.players[playerIndex].category}`);
-      msg = `选手${playersStore.players[playerIndex].name}平均排名为${playersStore.players[playerIndex].avgRankInCat}，现排在第${playersStore.players[playerIndex].ranking}名\n`;
+      console.log(`[${currentDateTime}] Player ${playerName} activated`);
+      console.log(`[${currentDateTime}] Player activated in category ${playerCategory}`);
+      msg = `选手${playerName}平均排名为${playersStore.players[playerIndex].avgRankInCat}\n`;
     } else {
-      console.log(`[${currentDateTime}] Player ${playersStore.players[playerIndex].name} deactivated`);
-      msg = `选手${playersStore.players[playerIndex].name}已被设为不活跃\n`;
+      console.log(`[${currentDateTime}] Player ${playerName} deactivated`);
+      msg = `选手${playerName}已被设为不活跃\n`;
     }
     rerankPlayer(playerIndex, null, payload.active);
-    cleanupCategories(playersStore.players[playerIndex].category);
-    msg += checkAndPromptGroupingMessage(playersStore.players[playerIndex].category);
+    cleanupCategories(playerCategory);
+    
+    // Reload store after rerankPlayer modifies data on disk
+    const updatedStore = loadStore();
+    const updatedPlayer = updatedStore.players.find(p => p.id === payload.id);
+    msg += `，现排在第 ${updatedPlayer.ranking} 名！`;
+    msg += checkAndPromptGroupingMessage(playerCategory);
   }
 
   console.log(`[${currentDateTime}] Player updated successfully`);

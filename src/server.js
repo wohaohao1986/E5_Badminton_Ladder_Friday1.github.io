@@ -90,7 +90,13 @@ app.post('/api/admin', (req, res) => {
 });
 
 app.put('/api/calculateStats', (req, res) => {
-  calculatePlayerStats();
+  console.log(`[${currentDateTime}] Request to calculate player stats`);
+  try {
+    calculatePlayerStats();
+    res.json({ message: 'Player stats calculated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Mount API routes
