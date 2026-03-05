@@ -15,5 +15,6 @@ build/
 .DS_Store
 .vscode/
 
-### Do not upload source data
+### Do not upload source data and local logs
 src/data/badminton_ladder_friday.json
+src/data/application.log
