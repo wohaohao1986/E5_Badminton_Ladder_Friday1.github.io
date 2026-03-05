@@ -1,13 +1,12 @@
 const express = require('express');
 const path = require('path');
-const { safeReadJson, safeWriteJson } = require('./utils/fileUtils');
+const { safeReadJson, safeWriteJson, logToFile } = require('./utils/fileUtils');
 const { DATA_FILE, ADMIN_CONFIG_FILE } = require('./utils/fileUtils');
-const { currentDateTime, sortPlayersByRanking, generateGroups, generateMatches, finishRound, autoFillScores, calculatePlayerStats, calculateAllPlayerAvgRankInCat } = require('./utils/dataUtils');
+const { currentDateTime, sortPlayersByRanking, generateGroups, generateMatches, generateGroupsAndMatches, finishRound, autoFillScores, calculatePlayerStats, calculateAllPlayerAvgRankInCat, resetGroupLogic } = require('./utils/dataUtils');
 
 // Import route handlers
 const playerRoutes = require('./routes/playerRoutes');
 const matchRoutes = require('./routes/matchRoutes');
-const groupRoutes = require('./routes/groupRoute');
 
 const app = express();
 app.use(express.json());
@@ -31,7 +30,7 @@ app.get('/api/main', (req, res) => {
 
 // Endpoint to generate groups and matches for current round
 app.put('/api/grouping', (req, res) => {
-  console.log(`[${currentDateTime}] Request to generate groups`);
+  logToFile('Request to generate groups');
   try {
     const msg = generateGroups();
     res.json({ message: msg });
@@ -41,7 +40,7 @@ app.put('/api/grouping', (req, res) => {
 });
 
 app.put('/api/generateMatch', (req, res) => {
-  console.log(`[${currentDateTime}] Request to generate matches`);
+  logToFile('Request to generate matches');
   try {
     const msg = generateMatches();
     res.json({ message: msg });
@@ -50,8 +49,19 @@ app.put('/api/generateMatch', (req, res) => {
   }
 });
 
+// Endpoint to generate groups and matches together for current round
+app.put('/api/generateGroupsAndMatches', (req, res) => {
+  logToFile('Request to generate groups and matches');
+  try {
+    const msg = generateGroupsAndMatches();
+    res.json({ message: msg });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.put('/api/finishRound', (req, res) => {
-  console.log(`[${currentDateTime}] Request to finish current round`);
+  logToFile('Request to finish current round');
   try {
     const msg = finishRound();
     res.json({ message: msg });
@@ -61,7 +71,7 @@ app.put('/api/finishRound', (req, res) => {
 });
 
 app.put('/api/calculateAvgRank', (req, res) => {
-  console.log(`[${currentDateTime}] Request to calculate average rank in category for all players`);
+  logToFile('Request to calculate average rank in category for all players');
   try {    calculateAllPlayerAvgRankInCat();
     res.json({ message: 'Average rank in category calculated for all players' });
   } catch (error) {
@@ -70,7 +80,7 @@ app.put('/api/calculateAvgRank', (req, res) => {
 });
 
 app.put('/api/randomScoring', (req, res) => {
-  console.log("Do random scoring");
+  logToFile('Request to do random scoring');
   try {
     const msg = autoFillScores();
     res.json({ message: msg });
@@ -81,7 +91,7 @@ app.put('/api/randomScoring', (req, res) => {
 
 app.post('/api/admin', (req, res) => {
   const adminInfo = safeReadJson(ADMIN_CONFIG_FILE, { username: 'admin', password: 'admin' });
-  console.log('Admin login attempt:', req.body.adminName, req.body.adminPassword);
+  logToFile(`Admin login attempt: ${req.body.adminName}`);
   if(req.body.adminName === adminInfo.admin.username && req.body.adminPassword === adminInfo.admin.password) {
     res.status(200).json({ authenticated: true });
   } else {
@@ -90,7 +100,7 @@ app.post('/api/admin', (req, res) => {
 });
 
 app.put('/api/calculateStats', (req, res) => {
-  console.log(`[${currentDateTime}] Request to calculate player stats`);
+  logToFile('Request to calculate player stats');
   try {
     calculatePlayerStats();
     res.json({ message: 'Player stats calculated successfully' });
@@ -99,15 +109,55 @@ app.put('/api/calculateStats', (req, res) => {
   }
 });
 
+app.put('/api/resetGroup', (req, res) => {
+  logToFile(`Request to reset a group with payload: ${JSON.stringify(req.body)}`);
+  const payload = req.body;
+  if (!payload || !payload.groupId || !payload.playerIds || !Array.isArray(payload.playerIds)) {
+    return res.status(400).json({ error: 'Invalid payload. Required: groupId, playerIds array' });
+  }
+  
+  try {
+    const message = resetGroupLogic(payload.groupId, payload.playerIds);
+    res.status(200).json({ message });
+  } catch (error) {
+    res.status(error.message === 'Group not found' ? 404 : 500).json({ error: error.message });
+  }
+});
+
+// Endpoint to update match score
+app.put('/api/match', (req, res) => {
+  const payload = req.body;
+  if (!payload || !payload.id) {
+    return res.status(400).json({ error: 'Invalid payload. Required: id' });
+  }
+
+  try {
+    const data = safeReadJson(DATA_FILE, { matches: [] });
+    const matchIndex = data.matches.findIndex(m => m.id === payload.id);
+    
+    if (matchIndex === -1) {
+      return res.status(404).json({ error: 'Match not found' });
+    }
+
+    // Update match with new values
+    data.matches[matchIndex] = { ...data.matches[matchIndex], ...payload };
+    safeWriteJson(DATA_FILE, data);
+    
+    logToFile(`Match ${payload.id} updated with score ${payload.score1} : ${payload.score2}`);
+    res.json({ message: 'Match updated successfully', entry: data.matches[matchIndex] });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Mount API routes
 app.use('/api/player', playerRoutes);
 app.use('/api/match', matchRoutes);
-app.use('/api/group', groupRoutes);
 
 // Serve static files (optional) - serves index.html / app.js if present
 app.use(express.static(path.join(__dirname)));
 
 const PORT = process.env.PORT || 80;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server is running on port ${PORT}`);
+  logToFile(`Server is running on port ${PORT}`);
 });

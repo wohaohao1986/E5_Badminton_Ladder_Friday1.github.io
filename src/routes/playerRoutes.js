@@ -1,5 +1,5 @@
 const express = require('express');
-const { DATA_FILE, safeReadJson, safeWriteJson } = require('../utils/fileUtils');
+const { DATA_FILE, safeReadJson, safeWriteJson, logToFile } = require('../utils/fileUtils');
 const { CATEGORIES, currentDateTime, rerankPlayer, sortPlayersByRanking, calculatePlayerAvgRankInCat } = require('../utils/dataUtils');
 const router = express.Router();
 
@@ -37,7 +37,7 @@ router.post('/', (req, res) => {
     newP.ranking = rankedPlayersInCat.length + 1; // set rank to last
     newP.returnCurrentRound = false; // default to false
     playersStore.players.push(newP);
-    console.log(`[${currentDateTime}] Request to Add a new player, name: ${newP.name}, category: ${CATEGORIES[newP.category]}`);
+    logToFile(`Request to Add a new player, name: ${newP.name}, category: ${CATEGORIES[newP.category]}`);
     const message = checkAndPromptGroupingMessage(newP.category, playersStore);
     saveStore(playersStore);
     res.status(201).json({ message });
@@ -54,7 +54,7 @@ router.put('/', (req, res) => {
   const playersStore = loadStore();
   const playerIndex = playersStore.players.findIndex(p => p.id === payload.id);
   if (playerIndex === -1) {
-    console.log('Player not found for update, client send:\n', payload);
+    logToFile(`Player not found for update, client send: ${JSON.stringify(payload)}`);
     return res.status(404).json({ error: 'Player not found' });
   }
 
@@ -65,7 +65,7 @@ router.put('/', (req, res) => {
   if ('category' in payload) {
     const oldCategory = currentPlayer.category;
     const playerName = currentPlayer.name;
-    console.log(`[${currentDateTime}] Player ${playerName}, category changed from ${CATEGORIES[oldCategory]} to ${CATEGORIES[payload.category]}`);
+    logToFile(`Player ${playerName}, category changed from ${CATEGORIES[oldCategory]} to ${CATEGORIES[payload.category]}`);
     changePlayerCategory(playerIndex, payload.category);
     cleanupCategories(oldCategory, payload.category);
     let updatedPlayer = loadStore().players.find(p => p.id === payload.id);
@@ -78,7 +78,7 @@ router.put('/', (req, res) => {
 
   // Ranking change
   if ('ranking' in payload) {
-    console.log(`[${currentDateTime}] Player ${playersStore.players[playerIndex].name}, ranking changed to ${payload.ranking}`);
+    logToFile(`Player ${playersStore.players[playerIndex].name}, ranking changed to ${payload.ranking}`);
     const playerName = playersStore.players[playerIndex].name;
     const playerCategory = playersStore.players[playerIndex].category;
     rerankPlayer(playerIndex, payload.ranking, null);
@@ -92,11 +92,11 @@ router.put('/', (req, res) => {
     const playerCategory = playersStore.players[playerIndex].category;
     
     if (payload.active === true) {
-      console.log(`[${currentDateTime}] Player ${playerName} activated`);
-      console.log(`[${currentDateTime}] Player activated in category ${playerCategory}`);
+      logToFile(`Player ${playerName} activated`);
+      logToFile(`Player activated in category ${playerCategory}`);
       msg = `选手${playerName}平均排名为${playersStore.players[playerIndex].avgRankInCat}\n`;
     } else {
-      console.log(`[${currentDateTime}] Player ${playerName} deactivated`);
+      logToFile(`Player ${playerName} deactivated`);
       msg = `选手${playerName}已被设为不活跃\n`;
     }
     rerankPlayer(playerIndex, null, payload.active);
@@ -109,7 +109,7 @@ router.put('/', (req, res) => {
     msg += checkAndPromptGroupingMessage(playerCategory);
   }
 
-  console.log(`[${currentDateTime}] Player updated successfully`);
+  logToFile('Player updated successfully');
   if (msg && msg.length > 0) {
     res.status(201).json({ message: msg });
   } else {
@@ -122,7 +122,7 @@ router.put('/delete', (req, res) => {
   const payload = requirePayload(req, res);
   if (!payload) return;
   const playerId = payload.id;
-  console.log(`[${currentDateTime}] Received delete request for playerId: ${playerId}`);
+  logToFile(`Received delete request for playerId: ${playerId}`);
 
   let playersStore = loadStore();
   const player = playersStore.players.find(p => p.id === playerId);
@@ -134,7 +134,7 @@ router.put('/delete', (req, res) => {
   // Re-rank, remove groups/matches
   cleanupCategories(player.category);
   sortPlayersByRanking();
-  console.log(`[${currentDateTime}] Player ${player.name} deleted successfully`);
+  logToFile(`Player ${player.name} deleted successfully`);
   const msg = `选手${player.name}已被删除\n请重新生成${CATEGORIES[player.category]}分组`;
   res.status(201).json({ message: msg });
 });

@@ -62,12 +62,14 @@
         <div class="card">
           <h3>核心规则</h3>
           <ul style="line-height:1.8;">
-            <li>所有选手按排名顺序分组</li>
-            <li>分成4人组和5人组（4人组优先）</li>
-            <li>不支持3人以下和7人组（需调整人数）</li>
-            <li>每人与组内其他所有人各搭档一次</li>
-            <li>在一方到达11分时，双方互换场地</li>
-            <li>比赛计分：抢21分，组内只按净胜分排名</li>
+            <li>新选手请前往管理页面进行注册</li>
+            <li>新选手默认排在最后一名，回归选手按照往期成绩排名</li>
+            <li>周五会员享有优先报名权利，dropin的选手若没申请到，本轮比赛将无法参与</li>
+            <li>报名截止时间为每周四晚上</li>
+            <li>所有选手按排名顺序,分成4人组和5人组（4人组优先）</li>
+            <li>每人会与组内其他所有人各搭档一次，4人组一共三场21分比赛，5人组一共五场15分比赛</li>
+            <li>在一方到达局分的一半时，双方互换场地</li>
+            <li>比赛计分：抢21分/15分，组内只按净胜分排名</li>
           </ul>
         </div>
 
@@ -82,12 +84,12 @@
         </div>
 
         <div class="card">
-          <h3>管理员功能</h3>
+          <h3>管理员/庄主功能</h3>
           <ul style="line-height:1.8;">
             <li>可手动调整选手的排名</li>
-            <li>新选手默认排在最后，可手动调整</li>
-            <li>重新生成分组和比赛</li>
-            <li>只有管理员可删除选手</li>
+            <li>生成分组和比赛</li>
+            <li>结束本轮比赛</li>
+            <li>删除选手</li>
           </ul>
         </div>
       </div>
@@ -97,24 +99,19 @@
         <div class="card">
           <h3>基本流程</h3>
           <ol style="line-height:1.8;">
-            <li>添加新选手 （新选手默认排在最后，可手动调整）</li>
-            <li>在管理页面，调整选手排名（需管理员权限）</li>
-            <li>在管理页面，生成分组和生成比赛（需管理员权限）</li>
+            <li>报名截止后庄主生成分组和比赛</li>
             <li><strong>注意：生成前请确保所有选手排名已正确设置, 自动分组目前以4人组为优先，最末的几组根据人数调整为5人组</strong></li>
-            <li>选手在报分页面 找到打过的比赛进行报分</li>
-            <li>在管理页面手动结束本轮，程序会自动根据净胜分进行升降级</li>
-            <li>按照以上步骤重复，进行下一轮比赛</li>
+            <li>选手在报分页面 找到完成的比赛进行报分</li>
+            <li>比赛全部完成后，庄主在管理页面手动结束本轮，程序会自动根据净胜分进行升降级</li>
+            <li>庄主在ladder群@宏波，告知比赛用时和总计场数</li>
           </ol>
         </div>
         <div class="card">
           <h3>注意事项</h3>
           <ul style="line-height:1.8;">
-            <li><strong>进行以下操作后，由于涉及到排名和分类，与之相关联的分组和比赛将被清空，需重新生成分组和比赛</strong></li>
-            <li>选手排名修改后</li>
-            <li>选手分类修改后</li>
-            <li>启用或禁用选手后</li>
-            <li>添加或删除选手后</li>
-            <li>如有比赛已经开始，上述操作均无法进行，如有意外情况请比赛结束后联系管理员修改比赛信息</li>
+            <li></li>
+            <li>请不要擅自修改其他选手的信息，如有误操作请及时联系管理员和庄主</li>
+            <li>如有比赛已经开始，则分组和比赛信息均无法修改，如有意外情况请及时联系管理员和庄主</li>
           </ul>
         </div>
       </div>
@@ -182,13 +179,9 @@
       <div class="card">
         <h2>分组管理</h2>
         <div class="flex" style="flex-wrap: wrap;">
-          <button onclick="generateGroups()" id="btn-generate-groups" class="btn-secondary">生成本轮分组（管理员）</button>
-          <button onclick="generateMatches()" id="btn-generate-matches" class="btn-secondary">生成本轮比赛（管理员）</button>
+          <button onclick="generateGroupsAndMatches()" id="btn-generate-group-match" class="btn-primary">生成本轮分组和比赛（管理员）</button>
           <button onclick="finishRound()" class="btn-warning">本轮结束（升降级）（管理员）</button>
-          <button onclick="resetPlayersInGroup()" class="btn-danger">重置一个分组（管理员）</button>
-          <button onclick="autoFillScores()" class="btn-danger">随机报分（测试用）</button>
-          <button onclick="calculatePlayerStats()" class="btn-danger">计算数据（测试用）</button>
-          <button onclick="calculateAvgRanking()" class="btn-danger">计算平均排名（测试用）</button>
+          <button onclick="resetPlayersInGroup()" class="btn-warning">重置一个分组（管理员）</button>
         </div>
         <div id="current-groups" class="mt-20"></div>
       </div>
@@ -219,6 +212,12 @@
         <p>本轮比赛：<span id="stat-matches">0</span> 场</p>
         <p>已完成：<span id="stat-completed">0</span> 场</p>
       </div>
+
+      <div class="card">
+        <h2>测试</h2>
+        <button onclick="autoFillScores()" class="btn-danger">随机报分（测试用）</button>
+        <button onclick="calculatePlayerStats()" class="btn-danger">计算数据（测试用）</button>
+        <button onclick="calculateAvgRanking()" class="btn-danger">计算平均排名（测试用）</button>
     </div>
   </div>
 

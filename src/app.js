@@ -154,7 +154,8 @@ function renderMatch() {
         groupMatches.forEach(m => {
           const status = m.completed ? 'match-completed' : 'match-pending';
           const score = m.completed ? `${m.score1} : ${m.score2}` : '待比赛';
-          html += `<div class="match-item ${status}">
+          const clickHandler = status === 'match-pending' ? ` onclick="selectMatchForScoring('${m.id}')" style="cursor:pointer;"` : '';
+          html += `<div class="match-item ${status}"${clickHandler}>
             <span>${m.team1.map(getPlayerName).join(' / ')} vs ${m.team2.map(getPlayerName).join(' / ')}</span>
             <span style="font-weight:bold;">${score}</span>
           </div>`;
@@ -455,6 +456,25 @@ async function submitScore(e) {
   renderScore();
 }
 
+// OnClick Function to select a match from the match list and navigate to score page
+function selectMatchForScoring(matchId) {
+  console.log('selectMatchForScoring called with matchId:', matchId);
+  
+  // First, render the score form to populate the dropdown options
+  renderScore();
+  console.log('renderScore completed');
+
+  // Navigate to the score page
+  showPage('score');
+  
+  // Then set the match selection dropdown to the clicked match
+  const select = document.getElementById('score-match');
+  select.value = matchId;
+  console.log('Dropdown value set to:', select.value);
+  updateScoreForm();
+
+}
+
 // OnClick Function for '修改比分' button
 async function editScore(matchId) {
   const match = data.matches.find(m => m.id === matchId);
@@ -641,7 +661,7 @@ async function resetPlayersInGroup() {
   const result = await showGroupPlayerSelector(groups);
   if (!result) return;
 
-  const response = await sendAuthenticatedRequest('/api/group/resetGroup', {
+  const response = await sendAuthenticatedRequest('/api/resetGroup', {
     groupId: result.groupId,
     playerIds: result.playerIds
   });
@@ -674,6 +694,27 @@ async function generateMatches() {
   const rep = await sendAuthenticatedRequest('/api/generateMatch', {});
   alert(rep.message);
   await syncDataFromServer();
+  renderMatch();
+  renderScore();
+}
+
+// OnClick Function for '生成分组和比赛' button - generates both groups and matches
+async function generateGroupsAndMatches() {
+  if (hasAnyMatchStarted()) {
+    alert('比赛已开始，无法修改');
+    return;
+  }
+  Object.keys(CATEGORIES).forEach(cat => {
+    const activePlayers = data.players.filter(p => p.active && p.category === cat);
+    const total = activePlayers.length;
+    
+    if (total < 4 || total === 0 || total === 6 || total === 11) 
+      return alert(`当前 ${CATEGORIES[cat]} 类别的选手人数为 ${total}，不适合进行分组和比赛，建议调整选手数量后再生成分组和比赛`);
+  });
+  const rep = await sendAuthenticatedRequest('/api/generateGroupsAndMatches', {});
+  alert(rep.message);
+  await syncDataFromServer();
+  renderAdmin();
   renderMatch();
   renderScore();
 }
