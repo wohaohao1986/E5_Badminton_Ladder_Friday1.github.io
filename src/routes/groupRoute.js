@@ -1,6 +1,6 @@
 const express = require('express');
 const { DATA_FILE, safeReadJson, safeWriteJson } = require('../utils/fileUtils');
-const { generateRoundRobinMatches, rankShift } = require('../utils/dataUtils');
+const { generateRoundRobinMatches, rerankPlayer } = require('../utils/dataUtils');
 const router = express.Router();
 
 // POST: Add a new group or multiple groups
@@ -69,15 +69,21 @@ router.put('/resetGroup', (req, res) => {
   const newMatches = generateRoundRobinMatches(playerIds, data.currentRound, groupId);
   data.matches.push(...newMatches);
   
-  // 3. For rest of players, set rank to '-' and active to false, use rankShift
+  // 3. For rest of players, deactivate them and re-rank
   const deactivatePlayerIds = group.playerIds.filter(id => !playerIds.includes(id));
+  
+  // Write data before reranking to have updated state
+  safeWriteJson(DATA_FILE, data);
+  
   deactivatePlayerIds.forEach(playerId => {
     const playerIdx = data.players.findIndex(p => p.id === playerId);
     if (playerIdx !== -1) {
-      data.players[playerIdx].active = false;
-      rankShift(data, category, playerIdx, null, false);
+      rerankPlayer(playerIdx, null, false);
     }
   });
+  
+  // Re-load data after reranking operations
+  data = safeReadJson(DATA_FILE);
   
   // Remove deactivated players from the group
   group.playerIds = playerIds;

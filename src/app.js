@@ -229,7 +229,7 @@ function renderRanking() {
     if (catPlayers.length === 0) return;
     
     html += `<h2 style="color:#4CAF50;margin-top:20px;margin-bottom:15px;">${CATEGORIES[cat]}</h2>`;
-    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;"><thead><tr style="background-color:#f5f5f5;"><th style="padding:10px;text-align:center;border:1px solid #ddd;">排名</th><th style="padding:10px;text-align:left;border:1px solid #ddd;">选手</th><th colspan="3" style="padding:10px;text-align:center;border:1px solid #ddd;background-color:#e8f5e9;">21分制</th><th colspan="3" style="padding:10px;text-align:center;border:1px solid #ddd;background-color:#e3f2fd;">15分制</th><th style="padding:10px;text-align:center;border:1px solid #ddd;">状态</th></tr><tr style="background-color:#f5f5f5;"><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th><th style="padding:5px;text-align:left;border:1px solid #ddd;"></th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">场数</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">胜</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">净分</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">场数</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">胜</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">净分</th><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th></tr></thead><tbody>';
+    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;"><thead><tr style="background-color:#f5f5f5;"><th style="padding:10px;text-align:center;border:1px solid #ddd;">排名</th><th style="padding:10px;text-align:left;border:1px solid #ddd;">选手</th><th colspan="3" style="padding:10px;text-align:center;border:1px solid #ddd;background-color:#e8f5e9;">21分制</th><th colspan="3" style="padding:10px;text-align:center;border:1px solid #ddd;background-color:#e3f2fd;">15分制</th><th style="padding:10px;text-align:center;border:1px solid #ddd;">平均排名\n(最近10轮)</th><th style="padding:10px;text-align:center;border:1px solid #ddd;">参赛轮次</th><th style="padding:10px;text-align:center;border:1px solid #ddd;">状态</th></tr><tr style="background-color:#f5f5f5;"><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th><th style="padding:5px;text-align:left;border:1px solid #ddd;"></th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">场数</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">胜</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">净分</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">场数</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">胜</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">净分</th><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th></tr></thead><tbody>';
     catPlayers.forEach((p, index) => {
       const statusClass = p.active ? '' : 'player-inactive';
       const statusText = p.active ? '参赛' : '未参赛';
@@ -239,6 +239,8 @@ function renderRanking() {
       const numberOfMatchesFifteen = p.numberOfMatchesFifteen || 0;
       const winsFifteen = p.winsFifteen || 0;
       const totalNetScoreFifteen = p.totalNetScoreFifteen || 0;
+      const avgRankInCat = p.avgRankInCat || 0;
+      const roundPlayed = p.roundPlayed || 0;
       html += `<tr class="${statusClass}" style="border-bottom:1px solid #ddd;">
         <td style="padding:10px;text-align:center;">#${index + 1}</td>
         <td style="padding:10px;">${p.name}</td>
@@ -248,6 +250,8 @@ function renderRanking() {
         <td style="padding:10px;text-align:center;">${numberOfMatchesFifteen}</td>
         <td style="padding:10px;text-align:center;">${winsFifteen}</td>
         <td style="padding:10px;text-align:center;">${totalNetScoreFifteen}</td>
+        <td style="padding:10px;text-align:center;">${avgRankInCat}</td>
+        <td style="padding:10px;text-align:center;">${roundPlayed}</td>
         <td style="padding:10px;text-align:center;color:#666;">${statusText}</td>
       </tr>`;
     });
@@ -511,14 +515,9 @@ async function changePlayerCategory(id) {
   // send update to server and handle any server-side warnings
   const serverRes = await updateDataToServer('/api/player', {id: id, category: selectedCat});
   await syncDataFromServer();
-  const newPlayer = data.players.find(p => p.id === id);
-  if (serverRes && serverRes.status === 'warning') {
-    alert(serverRes.message);
-  } else {
-    alert(`${player.name} 已改为${CATEGORIES[selectedCat]}，排名第${newPlayer.ranking}名`);
-    renderAdmin();
-    renderMatch();
-  }
+  alert(serverRes.message);
+  renderAdmin();
+  renderMatch();
 }
 
 // OnClick Function for '添加选手' button
@@ -662,6 +661,8 @@ async function generateGroups() {
   alert(rep.message);
   await syncDataFromServer();
   renderAdmin();
+  renderMatch();
+  renderScore();
 }
 
 // OnClick Function for '生成比赛' button
@@ -672,7 +673,9 @@ async function generateMatches() {
   }
   const rep = await sendAuthenticatedRequest('/api/generateMatch', {});
   alert(rep.message);
-  syncDataFromServer();
+  await syncDataFromServer();
+  renderMatch();
+  renderScore();
 }
 
 // OnClick Function for '结束本轮'按钮
@@ -696,6 +699,13 @@ async function finishRound() {
   renderAdmin();
   renderMatch();
   renderHistory();
+  renderRanking();
+}
+
+async function calculateAvgRanking() {
+  const response = await sendAuthenticatedRequest('/api/calculateAvgRank', {});
+  alert(response.message);
+  await syncDataFromServer();
   renderRanking();
 }
 
