@@ -209,15 +209,11 @@ function rerankPlayer(playerIndex, rank, isActive, isCategoryChange = false) {
   const player = data.players[playerIndex];
   
   if (rank !== null) {
-    const actualIndex = findPlayerIndex(data, p => p.id === player.id);
-    if (actualIndex !== -1) data.players.splice(actualIndex, 1);
-    
-    let insertIndex = 0;
-    for (let i = 0; i < data.players.length; i++) {
-      if (data.players[i].category === player.category && data.players[i].ranking < rank) insertIndex = i + 1;
-    }
-    data.players.splice(insertIndex, 0, player);
+    // Temporarily push the player out of original list
+    const tempPlayers = data.players.filter((_, idx) => idx !== playerIndex);
     player.ranking = rank;
+    tempPlayers.push(player);
+    data.players = tempPlayers;
   }
   
   if (isActive !== null) {
