@@ -3,6 +3,9 @@ const CATEGORIES = {
   xiyangyang: '喜羊羊'
 };
 
+// Track expanded players in admin view
+let expandedPlayers = new Set();
+
 const SERVER_BASE = (function(){
   try {
     const host = window.location.host;
@@ -339,16 +342,20 @@ function renderAdmin() {
         ? `<button onclick="togglePlayerActive('${p.id}')" class="btn-warning" style="padding:5px 10px;font-size:12px;">停用</button>`
         : `<button onclick="togglePlayerActive('${p.id}')" class="btn-info" style="padding:5px 10px;font-size:12px;">启用</button>`;
       const backgroundColor = p.isDropin ? '#E1BEE7' : '#C8E6C9';
+      const isExpanded = expandedPlayers.has(p.id);
+      const toggleIcon1 = isExpanded ? '▼' : '▶';
       
-      html += `<div class="ranking-item ${statusClass}" style="background-color:${backgroundColor}!important;">
-        <span style="font-weight:bold;min-width:40px;">#${p.ranking}</span>
-        <span style="flex:1;">${p.name}</span>
-        <div style="display:flex;gap:5px;">
-          <button onclick="changePlayerCategory('${p.id}')" class="btn-info" style="padding:5px 10px;font-size:12px;">改类别</button>
-          <button onclick="editPlayerRanking('${p.id}')" class="btn-info" style="padding:5px 10px;font-size:12px;">改排名</button>
+      html += `<div class="ranking-item ${statusClass}" style="background-color:${backgroundColor}!important;flex-direction:column;align-items:flex-start;" onclick="togglePlayerButtons('${p.id}', event)">
+        <div style="display:flex;align-items:center;gap:10px;width:100%;">
+          <span style="font-weight:bold;min-width:40px;">#${p.ranking}</span>
+          <span style="flex:1;cursor:pointer;display:flex;align-items:center;gap:8px;"><span style="font-size:14px;width:16px;display:inline-block;text-align:center;">${toggleIcon1}</span>${p.name}</span>
+        </div>
+        <fieldset style="display:${isExpanded ? 'block' : 'none'};border:none;padding:0;margin:10px 0 0 0;padding-left:60px;" class="player-buttons-${p.id}" onclick="event.stopPropagation();">
+          <button onclick="changePlayerCategory('${p.id}')" class="btn-info" style="padding:5px 10px;font-size:12px;margin-right:5px;">改类别</button>
+          <button onclick="editPlayerRanking('${p.id}')" class="btn-info" style="padding:5px 10px;font-size:12px;margin-right:5px;">改排名</button>
           ${statusBtn}
           <button onclick="deletePlayer('${p.id}')" class="btn-danger" style="padding:5px 10px;font-size:12px;">删除</button>
-        </div>
+        </fieldset>
       </div>`;
     });
   });
@@ -379,6 +386,17 @@ function renderAdmin() {
   document.getElementById('stat-groups').textContent = currentGroups.length;
   document.getElementById('stat-matches').textContent = currentMatches.length;
   document.getElementById('stat-completed').textContent = currentMatches.filter(m => m.completed).length;
+}
+
+// Toggle player buttons visibility
+function togglePlayerButtons(playerId, event) {
+  event.preventDefault();
+  if (expandedPlayers.has(playerId)) {
+    expandedPlayers.delete(playerId);
+  } else {
+    expandedPlayers.add(playerId);
+  }
+  renderAdmin();
 }
 
 function renderGroupEditor() {
