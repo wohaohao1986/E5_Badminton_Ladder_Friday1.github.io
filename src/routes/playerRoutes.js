@@ -40,6 +40,7 @@ router.post('/', (req, res) => {
     logToFile(`Request to Add a new player, name: ${newP.name}, category: ${CATEGORIES[newP.category]}`);
     const message = checkAndPromptGroupingMessage(newP.category, playersStore);
     saveStore(playersStore);
+    sortPlayersByRanking();
     res.status(201).json({ message });
   } else {
     res.status(201).json({ message: '该选手已存在，无法添加' });

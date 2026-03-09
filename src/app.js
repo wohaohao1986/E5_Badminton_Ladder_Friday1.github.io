@@ -338,8 +338,9 @@ function renderAdmin() {
       const statusBtn = p.active 
         ? `<button onclick="togglePlayerActive('${p.id}')" class="btn-warning" style="padding:5px 10px;font-size:12px;">停用</button>`
         : `<button onclick="togglePlayerActive('${p.id}')" class="btn-info" style="padding:5px 10px;font-size:12px;">启用</button>`;
+      const backgroundColor = p.isDropin ? '#E1BEE7' : '#C8E6C9';
       
-      html += `<div class="ranking-item ${statusClass}">
+      html += `<div class="ranking-item ${statusClass}" style="background-color:${backgroundColor}!important;">
         <span style="font-weight:bold;min-width:40px;">#${p.ranking}</span>
         <span style="flex:1;">${p.name}</span>
         <div style="display:flex;gap:5px;">
@@ -549,6 +550,7 @@ async function addPlayer() {
 
   const category = document.getElementById('new-player-category').value;
   const name = document.getElementById('new-player-name').value.trim();
+  const isDropin = document.getElementById('dropin-checkbox').checked;
   if (!name) {
     alert('请输入选手姓名');
     return;
@@ -558,6 +560,7 @@ async function addPlayer() {
     name, 
     active: true,
     category: category,
+    isDropin: isDropin,
     numberOfMatchesTwentyOne: 0,
     winsTwentyOne: 0,
     totalNetScoreTwentyOne: 0,

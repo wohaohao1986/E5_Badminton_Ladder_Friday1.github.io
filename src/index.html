@@ -194,12 +194,16 @@
             <option value="xiyangyang">喜羊羊</option>
           </select>
           <input type="text" id="new-player-name" placeholder="输入选手姓名" style="flex: 1;">
+          <label style="display: flex; align-items: center; margin-left: 0px;">
+            <input type="checkbox" id="dropin-checkbox">
+            <span style="margin-left: 0px;">Drop-in 请打勾</span>
+          </label>
           <button onclick="addPlayer()" class="btn-primary">添加</button>
         </div>
       </div>
 
       <div class="card">
-        <h2>排名管理 （<span id="player-count">0</span>人，<span id="active-count">0</span>人参赛）</h2>
+        <h2>排名管理 （绿底为周五会员，紫底为dropin）（<span id="player-count">0</span>人，<span id="active-count">0</span>人参赛）</h2>
         <div id="player-ranking-list"></div>
       </div>
 
