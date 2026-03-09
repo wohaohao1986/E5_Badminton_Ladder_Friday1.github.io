@@ -188,17 +188,17 @@
 
       <div class="card">
         <h2>添加选手</h2>
-        <div class="flex">
-          <select id="new-player-category" style="width:120px;">
+        <div class="flex" style="flex-wrap: wrap; gap: 8px; align-items: center;">
+          <select id="new-player-category" style="width:120px; flex-shrink: 0;">
             <option value="huitailang">灰太狼</option>
             <option value="xiyangyang">喜羊羊</option>
           </select>
-          <input type="text" id="new-player-name" placeholder="输入选手姓名" style="flex: 1;">
-          <label style="display: flex; align-items: center; margin-left: 0px;">
+          <input type="text" id="new-player-name" placeholder="输入选手姓名" style="flex: 1; min-width: 80px; max-width: 180px;">
+          <label style="display: flex; align-items: center; white-space: nowrap; flex-shrink: 0; order: 5;">
             <input type="checkbox" id="dropin-checkbox">
-            <span style="margin-left: 0px;">Drop-in 请打勾</span>
+            <span style="margin-left: 5px; font-size: 14px;">Drop-in</span>
           </label>
-          <button onclick="addPlayer()" class="btn-primary">添加</button>
+          <button onclick="addPlayer()" class="btn-primary" style="flex-shrink: 0;">添加</button>
         </div>
       </div>
 

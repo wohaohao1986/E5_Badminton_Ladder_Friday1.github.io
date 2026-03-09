@@ -626,6 +626,10 @@ async function editPlayerRanking(playerId) {
   }
 
   const player = data.players.find(p => p.id === playerId);
+  if (player.active === false) {
+    alert('选手未参赛，无法修改排名');
+    return;
+  }
   const currentRank = player.ranking;
   const activePlayersInCategory = data.players.filter(p => p.category === player.category && typeof p.ranking === 'number');
   const newRank = prompt(`${player.name} 当前排名：第 ${currentRank} 名\n\n请输入新排名（1-${activePlayersInCategory.length}）：`);

@@ -212,7 +212,7 @@ function rerankPlayer(playerIndex, rank, isActive, isCategoryChange = false) {
     // Temporarily push the player out of original list
     const tempPlayers = data.players.filter((_, idx) => idx !== playerIndex);
     player.ranking = rank;
-    tempPlayers.push(player);
+    tempPlayers.splice(rank - 1, 0, player);
     data.players = tempPlayers;
   }
   
