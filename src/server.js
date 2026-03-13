@@ -7,6 +7,7 @@ const { currentDateTime, sortPlayersByRanking, generateGroups, generateMatches, 
 // Import route handlers
 const playerRoutes = require('./routes/playerRoutes');
 const matchRoutes = require('./routes/matchRoutes');
+const opensRoutes = require('./routes/opensRoutes');
 
 const app = express();
 app.use(express.json());
@@ -175,6 +176,7 @@ app.put('/api/match', (req, res) => {
 // Mount API routes
 app.use('/api/player', playerRoutes);
 app.use('/api/match', matchRoutes);
+app.use('/api/opens', opensRoutes);
 
 // Serve static files (optional) - serves index.html / app.js if present
 app.use(express.static(path.join(__dirname)));
