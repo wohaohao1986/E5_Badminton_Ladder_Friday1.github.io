@@ -115,7 +115,7 @@ async function syncDataFromServer() {
 
 // Navigation and rendering pages
 function showPage(page) {
-  ['home', 'match', 'score', 'ranking', 'history', 'admin'].forEach(p => {
+  ['home', 'match', 'score', 'ranking', 'history', 'admin', 'opens'].forEach(p => {
     document.getElementById(`page-${p}`).classList.add('hidden');
     document.getElementById(`nav-${p}`).classList.remove('active');
   });
@@ -127,6 +127,7 @@ function showPage(page) {
   if (page === 'ranking') renderRanking();
   if (page === 'history') renderHistory();
   if (page === 'admin') renderAdmin();
+  if (page === 'opens') renderOpens();
 }
 
 function renderMatch() {
@@ -1003,74 +1004,6 @@ function showGroupPlayerSelector(groups) {
 }
 
 // Helper function for admin operation to show a modal dialog
-function promptForAdminCredentials() {
-  return new Promise((resolve) => {
-    const container = document.createElement('div');
-    container.id = 'admin-modal';
-    container.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;';
-    
-    const modal = document.createElement('div');
-    modal.style.cssText = 'background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); max-width: 400px; width: 90%;';
-    
-    const title = document.createElement('h3');
-    title.textContent = '管理员验证';
-    title.style.cssText = 'margin-top: 0; margin-bottom: 20px; color: #333;';
-    
-    const nameLabel = document.createElement('div');
-    nameLabel.textContent = '用户名：';
-    nameLabel.style.cssText = 'margin-bottom: 8px; font-size: 14px; color: #666;';
-    
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.style.cssText = 'width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; margin-bottom: 15px;';
-    
-    const passwordLabel = document.createElement('div');
-    passwordLabel.textContent = '密码：';
-    passwordLabel.style.cssText = 'margin-bottom: 8px; font-size: 14px; color: #666;';
-    
-    const passwordInput = document.createElement('input');
-    passwordInput.type = 'password';
-    passwordInput.style.cssText = 'width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; margin-bottom: 20px;';
-    
-    const btnContainer = document.createElement('div');
-    btnContainer.style.cssText = 'display: flex; gap: 10px; justify-content: flex-end;';
-    
-    const okBtn = document.createElement('button');
-    okBtn.textContent = '确定';
-    okBtn.style.cssText = 'padding: 8px 20px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;';
-    okBtn.onclick = () => {
-      document.body.removeChild(container);
-      resolve({ name: nameInput.value, password: passwordInput.value });
-    };
-    // Allow pressing Enter to confirm
-    container.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        okBtn.click();
-      }
-    });
-    const cancelBtn = document.createElement('button');
-    cancelBtn.textContent = '取消';
-    cancelBtn.style.cssText = 'padding: 8px 20px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;';
-    cancelBtn.onclick = () => {
-      document.body.removeChild(container);
-      resolve(null);
-    };
-    
-    btnContainer.appendChild(okBtn);
-    btnContainer.appendChild(cancelBtn);
-    modal.appendChild(title);
-    modal.appendChild(nameLabel);
-    modal.appendChild(nameInput);
-    modal.appendChild(passwordLabel);
-    modal.appendChild(passwordInput);
-    modal.appendChild(btnContainer);
-    container.appendChild(modal);
-    document.body.appendChild(container);
-    nameInput.focus();
-  });
-}
-
 //Helper function to check if any match is completed
 function hasAnyMatchStarted() {
   const currentMatches = data.matches.filter(m => m.round === data.currentRound);
