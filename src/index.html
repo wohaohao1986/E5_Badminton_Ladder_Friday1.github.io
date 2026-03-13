@@ -51,6 +51,7 @@
     <button onclick="showPage('ranking')" id="nav-ranking">总排名</button>
     <button onclick="showPage('history')" id="nav-history">历史记录</button>
     <button onclick="showPage('admin')" id="nav-admin">管理</button>
+    <button onclick="showPage('opens')" id="nav-opens">公开赛</button>
   </div>
 
 
@@ -222,9 +223,17 @@
         <button onclick="autoFillScores()" class="btn-danger">随机报分（测试用）</button>
         <button onclick="calculatePlayerStats()" class="btn-danger">计算数据（测试用）</button>
         <button onclick="calculateAvgRanking()" class="btn-danger">计算平均排名（测试用）</button>
+      </div>
+    </div>
+
+    <div id="page-opens" class="hidden">
+      <h1>公开赛</h1>
+      <div id="opens-list"></div>
     </div>
   </div>
 
+  <script src="api.js"></script>
+  <script src="opens.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

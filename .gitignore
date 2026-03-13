@@ -18,3 +18,4 @@ build/
 ### Do not upload source data and local logs
 src/data/badminton_ladder_friday.json
 src/data/application.log
+src/data/e5_opens.json
