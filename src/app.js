@@ -374,6 +374,18 @@ function renderAdmin() {
       });
     });
     document.getElementById('current-groups').innerHTML = html;
+    
+    // Add rearrange buttons for each category with groups
+    let buttonsHtml = '';
+    Object.keys(CATEGORIES).forEach(cat => {
+      const catGroups = data.groups.filter(g => g.category === cat);
+      if (catGroups.length > 0) {
+        buttonsHtml += `<button onclick="showRearrangeGroupsModal('${cat}')" class="btn-info" style="margin-right:10px;margin-top:10px;">重新排列${CATEGORIES[cat]}组</button>`;
+      }
+    });
+    if (buttonsHtml) {
+      document.getElementById('current-groups').innerHTML += '<div style="margin-top:15px;">' + buttonsHtml + '</div>';
+    }
   } else {
     document.getElementById('current-groups').innerHTML = '';
   }
@@ -1006,6 +1018,136 @@ async function autoFillScores() {
   
   await syncDataFromServer();
   renderScore();
+}
+
+// ========== GROUP REARRANGEMENT FUNCTIONS ==========
+
+// Get current group sizes for a category
+function getGroupSizes(category) {
+  const catGroups = data.groups.filter(g => g.category === category).sort((a, b) => a.level - b.level);
+  return catGroups.map(g => g.playerIds.length);
+}
+
+// Show rearrangement UI
+function showRearrangeGroupsModal(category) {
+  const currentSizes = getGroupSizes(category);
+  
+  let html = `
+    <div class="modal-overlay" id="rearrangeModal">
+      <div class="modal-content" style="max-width:500px;">
+        <h2>重新排列 ${CATEGORIES[category]} 组人数</h2>
+        <p>当前组人数: ${currentSizes.join(', ')}</p>
+        <p style="color:#666;">拖拽调整组的顺序 (总人数: ${currentSizes.reduce((a,b)=>a+b,0)}人)</p>
+        
+        <div class="form-group">
+          <div id="groupSizesList" style="display:flex; flex-wrap:wrap; gap:10px;">
+    `;
+  
+  currentSizes.forEach((size, idx) => {
+    html += `<div class="group-size-item" draggable="true" data-index="${idx}" style="padding:10px; background:#4CAF50; color:white; border-radius:5px; cursor:move;">
+      ${size}人
+    </div>`;
+  });
+  
+  html += `
+          </div>
+        </div>
+        
+        <div style="margin-top:20px;">
+          <button onclick="submitNewGroupSizes('${category}')" class="btn-primary">确认</button>
+          <button onclick="closeRearrangeModal()" class="btn-secondary" style="margin-left:10px;">取消</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', html);
+  initDragAndDrop();
+}
+
+// Initialize drag and drop for group sizes
+function initDragAndDrop() {
+  const items = document.querySelectorAll('.group-size-item');
+  let draggedItem = null;
+  
+  items.forEach(item => {
+    item.addEventListener('dragstart', (e) => {
+      draggedItem = item;
+      item.style.opacity = '0.5';
+    });
+    
+    item.addEventListener('dragend', (e) => {
+      item.style.opacity = '1';
+      draggedItem = null;
+    });
+    
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (draggedItem && draggedItem !== item) {
+        const allItems = Array.from(document.querySelectorAll('.group-size-item'));
+        const draggedIdx = allItems.indexOf(draggedItem);
+        const targetIdx = allItems.indexOf(item);
+        
+        if (draggedIdx < targetIdx) {
+          item.parentNode.insertBefore(draggedItem, item.nextSibling);
+        } else {
+          item.parentNode.insertBefore(draggedItem, item);
+        }
+      }
+    });
+  });
+}
+
+// Submit rearranged group sizes
+async function submitNewGroupSizes(category) {
+  // Get the new sizes from the DOM elements
+  const items = Array.from(document.querySelectorAll('.group-size-item'));
+  const newSizes = items.map(item => {
+    const text = item.textContent.trim();
+    return parseInt(text);
+  });
+  
+  // Validate
+  const currentSizes = getGroupSizes(category);
+  const totalCurrent = currentSizes.reduce((a, b) => a + b, 0);
+  const totalNew = newSizes.reduce((a, b) => a + b, 0);
+  
+  if (totalNew !== totalCurrent) {
+    alert(`总人数必须相同！当前: ${totalCurrent}人，新: ${totalNew}人`);
+    return;
+  }
+  
+  if (newSizes.some(s => s < 4 || s > 5)) {
+    alert('每组必须是4-5人');
+    return;
+  }
+  
+  const rearrangeData = {
+    category: category,
+    newGroupSizes: newSizes,
+    currentRound: data.currentRound
+  };
+  
+  try {
+    const result = await updateDataToServer('/api/rearrangeGroups', rearrangeData);
+    if (result && result.success) {
+      alert('分组重新排列成功！');
+      await syncDataFromServer();
+      renderMatch();
+      closeRearrangeModal();
+      renderAdmin();
+    } else {
+      alert('重新排列失败：' + (result?.message || '未知错误'));
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    alert('提交失败！');
+  }
+}
+
+function closeRearrangeModal() {
+  const modal = document.getElementById('rearrangeModal');
+  if (modal) modal.remove();
 }
 
 init();

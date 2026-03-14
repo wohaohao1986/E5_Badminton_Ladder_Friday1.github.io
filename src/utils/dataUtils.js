@@ -429,7 +429,75 @@ const generateRandomScore = () => {
   return { score1: winner === 1 ? 21 : Math.floor(Math.random() * 10) + 10, score2: winner === 2 ? 21 : Math.floor(Math.random() * 10) + 10 };
 };
 
+// ========== GROUP REARRANGEMENT ==========
+function rearrangeGroups(data, category, newGroupSizes, currentRound) {
+  // Get groups for this category to get previous arrangement
+  const catGroups = data.groups
+    .filter(g => g.category === category && g.level)
+    .sort((a, b) => a.level - b.level);
+  
+  const previousArrangement = catGroups.map(g => g.playerIds.length);
+  
+  // Collect all players from existing groups
+  let allPlayers = [];
+  catGroups.forEach(g => {
+    allPlayers.push(...g.playerIds);
+  });
+  
+  // Validate total players
+  const currentTotal = allPlayers.length;
+  const newTotal = newGroupSizes.reduce((a, b) => a + b, 0);
+  
+  if (currentTotal !== newTotal) {
+    return { success: false, message: `总人数不匹配：当前${currentTotal}人，新${newTotal}人` };
+  }
+  
+  if (newGroupSizes.some(s => s < 4 || s > 5)) {
+    return { success: false, message: '每组必须是4-5人' };
+  }
+  
+  // Create new groups with new sizes
+  const newGroups = [];
+  let playerIndex = 0;
+  
+  newGroupSizes.forEach((size, idx) => {
+    const newPlayerIds = allPlayers.slice(playerIndex, playerIndex + size);
+    newGroups.push({
+      id: `${category}-group-${idx + 1}`,
+      level: idx + 1,
+      playerIds: newPlayerIds,
+      category: category
+    });
+    playerIndex += size;
+  });
+  
+  // Replace old groups with new groups
+  data.groups = data.groups.filter(g => g.category !== category);
+  data.groups.push(...newGroups);
+  
+  // Regenerate matches for this category
+  const newMatches = [];
+  newGroups.forEach(group => {
+    const groupMatches = generateRoundRobinMatches(group.playerIds, currentRound, group.id);
+    newMatches.push(...groupMatches);
+  });
+  
+  // Remove old matches for this category and current round
+  data.matches = data.matches.filter(m => {
+    const isCurrentCategoryMatch = m.groupId.startsWith(category);
+    const isCurrentRound = m.round === currentRound;
+    return !(isCurrentCategoryMatch && isCurrentRound);
+  });
+  
+  // Add new matches
+  data.matches.push(...newMatches);
+  
+  const successMsg = `${CATEGORIES[category]}: 从 [${previousArrangement.join(',')}] 重新排列为 [${newGroupSizes.join(',')}]`;
+  logToFile(successMsg);
+  return { success: true, message: `${CATEGORIES[category]}已重新排列为${newGroupSizes.join(',')}` };
+}
+
 module.exports = {
   CATEGORIES, currentDateTime, sortPlayersByRanking, generateGroups, generateMatches, generateGroupsAndMatches,
-  rerankPlayer, finishRound, autoFillScores, calculatePlayerStats, calculatePlayerAvgRankInCat, calculateAllPlayerAvgRankInCat, resetGroupLogic
+  rerankPlayer, finishRound, autoFillScores, calculatePlayerStats, calculatePlayerAvgRankInCat, calculateAllPlayerAvgRankInCat, resetGroupLogic, rearrangeGroups
 };

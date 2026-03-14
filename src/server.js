@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const { safeReadJson, safeWriteJson, logToFile } = require('./utils/fileUtils');
 const { DATA_FILE, ADMIN_CONFIG_FILE } = require('./utils/fileUtils');
-const { currentDateTime, sortPlayersByRanking, generateGroups, generateMatches, generateGroupsAndMatches, finishRound, autoFillScores, calculatePlayerStats, calculateAllPlayerAvgRankInCat, resetGroupLogic } = require('./utils/dataUtils');
+const { currentDateTime, sortPlayersByRanking, generateGroups, generateMatches, generateGroupsAndMatches, finishRound, autoFillScores, calculatePlayerStats, calculateAllPlayerAvgRankInCat, resetGroupLogic, rearrangeGroups } = require('./utils/dataUtils');
 
 // Import route handlers
 const playerRoutes = require('./routes/playerRoutes');
@@ -86,6 +86,28 @@ app.put('/api/randomScoring', (req, res) => {
     res.json({ message: msg });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/rearrangeGroups', (req, res) => {
+  try {
+    const { category, newGroupSizes, currentRound } = req.body;
+    
+    if (!category || !newGroupSizes || !Array.isArray(newGroupSizes)) {
+      return res.status(400).json({ success: false, message: '参数无效' });
+    }
+    
+    const data = safeReadJson(DATA_FILE, { players: [], groups: [], matches: [], currentRound: 1, roundHistory: [], matchHistory: [] });
+    const result = rearrangeGroups(data, category, newGroupSizes, currentRound);
+    
+    if (result.success) {
+      safeWriteJson(DATA_FILE, data);
+      res.json({ success: true, message: result.message });
+    } else {
+      res.status(400).json({ success: false, message: result.message });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
