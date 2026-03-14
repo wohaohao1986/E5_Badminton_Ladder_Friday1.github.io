@@ -1,0 +1,193 @@
+# Badminton Ladder Project Instructions
+
+> **For contributors:** This file is automatically read by GitHub Copilot for everyone
+> who opens this project. To add your own rules, edit this file directly or ask Copilot:
+> *"Update copilot-instructions.md to add rules for [your feature/area]"*
+
+## Project Overview
+- **Name:** E5 Badminton Ladder Friday
+- **Type:** Node.js Express backend + Vanilla JavaScript frontend
+- **Purpose:** Tournament management system for badminton ladder rankings
+- **Main Language:** JavaScript (both server and client-side)
+
+## Project Structure
+```
+src/
+  ├── server.js              # Express server with REST API endpoints
+  ├── app.js                 # Frontend logic and UI rendering
+  ├── routes/
+  │   ├── playerRoutes.js    # Player-related endpoints
+  │   └── matchRoutes.js     # Match-related endpoints
+  ├── utils/
+  │   ├── dataUtils.js       # Core algorithms (ranking, grouping, matching)
+  │   └── fileUtils.js       # File I/O and JSON persistence
+  └── data/
+      ├── badminton_ladder_friday.json  # Main data storage
+      ├── admin_config.json             # Admin credentials
+      └── application.log               # Logging output
+```
+
+## Key Concepts
+
+### Categories
+- **灰太狼 (huitailang):** Advanced players
+- **喜羊羊 (xiyangyang):** Intermediate players
+
+### Core Functions to Understand
+1. **`calculatePlayerStats()`** - Computes rankings, win rates, and player statistics
+2. **`rerankPlayer(id)`** - Updates individual player ranking after matches
+3. **`rearrangeGroups(data, category, newGroupSizes, currentRound)`** - Reorganizes player groups
+4. **`generateRoundRobinMatches(playerIds, round, groupId)`** - Creates match pairings
+5. **`finishRound()`** - Completes current round and transitions to next
+
+### Data Model
+- **Players:** Have ID, name, ranking, category, active status, statistics
+- **Groups:** Contain 4-5 players, organized by skill level
+- **Matches:** Round-robin pairings within groups
+- **Rounds:** Sequential tournament stages
+
+## Code Standards
+
+### Style Guidelines
+- Use **async/await** for asynchronous operations (not promises)
+- **Always validate inputs** before processing
+- Use **logToFile()** for important operations and debugging
+- **Error handling:** Use try-catch with meaningful error messages
+- **Naming:** 
+  - camelCase for variables and functions
+  - SCREAMING_SNAKE_CASE for constants
+  - Descriptive names (e.g., `playerIds` not `pids`)
+
+### Function Guidelines
+- Keep functions under 50 lines when possible
+- Document complex algorithms with comments
+- Return objects with `{ success, message }` structure for API consistency
+- Use immutable updates for data (don't mutate directly when unnecessary)
+
+### Logging
+```javascript
+// Always use logToFile for important operations
+logToFile(`Action: ${description}`);
+logToFile(`Result: ${JSON.stringify(result)}`);
+```
+
+### Error Handling
+```javascript
+try {
+  // operation
+  logToFile('Operation succeeded');
+  res.json({ success: true, message: 'Success message' });
+} catch (error) {
+  logToFile(`Error: ${error.message}`);
+  res.status(500).json({ success: false, message: error.message });
+}
+```
+
+## When Adding Features
+
+### Backend (API Endpoints)
+1. Add route handler in `src/server.js`
+2. Import required utilities
+3. Validate request parameters
+4. Call appropriate function from `dataUtils.js`
+5. Return JSON response with `{ success, message, data }` structure
+
+### Frontend (UI)
+1. Create function in `src/app.js`
+2. Use `updateDataToServer()` for API calls
+3. Update relevant render functions after changes
+4. Add appropriate event listeners to DOM elements
+
+### Data Processing
+1. Write algorithm in `src/utils/dataUtils.js`
+2. Add unit tests for new functions
+3. Test with sample data in quick tests
+4. Log key operations
+
+### Testing
+- Use Jest framework (when configured)
+- Test edge cases and error conditions
+- Verify data integrity after operations
+- Test with various player counts (4, 8, 12, 16+ players)
+
+## Algorithm Notes
+
+### Current Ranking System
+- Based on match results (wins/losses)
+- Players ranked within their category
+- Can be modified with weighted scoring
+
+### Group Distribution
+- 4-5 players per group
+- Calculated based on total active players
+- Can be manually rearranged with `rearrangeGroups()`
+
+### Match Generation
+- Round-robin format within each group
+- 3 matches for 4-player groups
+- 5 matches for 5-player groups
+
+## UI/Styling Guidelines
+- **Color Scheme:** 
+  - Primary action: Green (#4CAF50)
+  - Secondary: Light gray backgrounds
+  - Text: Dark gray/black on light backgrounds
+- **Layouts:** Use Flexbox for responsive design
+- **Modals:** Use overlay pattern with `.modal-overlay` and `.modal-content` classes
+- **Accessibility:** Ensure buttons are clickable with good contrast
+
+## Common Tasks
+
+### Task: Add New Algorithm
+1. Write function in `dataUtils.js`
+2. Export it at the bottom of file
+3. Import in `server.js`
+4. Create API endpoint
+5. Call from `app.js`
+
+### Task: Modify Ranking Calculation
+1. Find `calculatePlayerStats()` in `dataUtils.js`
+2. Update calculation logic
+3. Test with sample player data
+4. Verify with multiple rounds
+
+### Task: Change UI Style
+1. Modify styles in `<style>` section of `app.js` or separate CSS file
+2. Test on different screen sizes
+3. Update responsive breakpoints if needed
+
+### Task: Add Unit Tests
+1. Create file in `test/` directory
+2. Use Jest syntax
+3. Test success cases and error conditions
+4. Run with `npm test`
+
+## Important Files NOT to Break
+- `src/server.js` - Critical for API functionality
+- `src/utils/dataUtils.js` - All core algorithms here
+- `src/data/badminton_ladder_friday.json` - Main data storage
+
+## Before Deploying Changes
+- [ ] Test with current data
+- [ ] Check logs for errors
+- [ ] Verify UI renders correctly
+- [ ] Test all related endpoints
+- [ ] Update documentation if needed
+
+## Useful Commands
+```bash
+npm start              # Start server
+npm test              # Run unit tests (when configured)
+node src/server.js   # Direct server start
+```
+
+## Chinese Terms (for UI)
+- 分组 = Group/Grouping
+- 比赛 = Match/Game
+- 排名 = Ranking
+- 灰太狼 = Advanced category
+- 喜羊羊 = Intermediate category
+- 确认 = Confirm
+- 取消 = Cancel
+- 成功 = Success
+- 失败 = Failed
