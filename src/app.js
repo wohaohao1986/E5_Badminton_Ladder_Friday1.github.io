@@ -6,6 +6,9 @@ const CATEGORIES = {
 // Track expanded players in admin view
 let expandedPlayers = new Set();
 
+// Cached admin credentials for this page session (cleared on page refresh)
+let _cachedAdminCredentials = null;
+
 const SERVER_BASE = (function(){
   try {
     const host = window.location.host;
@@ -87,13 +90,19 @@ function deleteFromServer(path, payload) {
 
 // Handle admin authentication for sensitive operations
 async function sendAuthenticatedRequest(endpoint, payload) {
-  const credentials = await promptForAdminCredentials();
-  if (!credentials) return;
+  // Use cached credentials if already verified this session
+  let credentials = _cachedAdminCredentials;
+  if (!credentials) {
+    credentials = await promptForAdminCredentials();
+    if (!credentials) return;
+  }
 
   const adminResponse = await addDataToServer('/api/admin/', { adminName: credentials.name, adminPassword: credentials.password });
   if (adminResponse && adminResponse.authenticated) {
+    _cachedAdminCredentials = credentials; // cache on first successful verify
     return updateDataToServer(endpoint, payload);
   } else {
+    _cachedAdminCredentials = null; // clear cache so user can re-enter
     alert('管理员验证失败，请检查用户名和密码！');
   }
 }
