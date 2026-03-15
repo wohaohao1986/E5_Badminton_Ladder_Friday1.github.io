@@ -116,6 +116,7 @@ async function syncDataFromServer() {
 // Navigation and rendering pages
 function showPage(page) {
   ['home', 'match', 'score', 'ranking', 'history', 'admin', 'opens'].forEach(p => {
+  ['home', 'match', 'score', 'ranking', 'history', 'admin', 'opens'].forEach(p => {
     document.getElementById(`page-${p}`).classList.add('hidden');
     document.getElementById(`nav-${p}`).classList.remove('active');
   });
@@ -127,6 +128,7 @@ function showPage(page) {
   if (page === 'ranking') renderRanking();
   if (page === 'history') renderHistory();
   if (page === 'admin') renderAdmin();
+  if (page === 'opens') renderOpens();
   if (page === 'opens') renderOpens();
 }
 
