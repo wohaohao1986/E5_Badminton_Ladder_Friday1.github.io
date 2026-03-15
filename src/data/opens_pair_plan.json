@@ -1,0 +1,38 @@
+{
+    "males_matches": [
+        {"team1": ["A1", "A2"], "team2": ["B1", "B2"]},
+        {"team1": ["A3", "A4"], "team2": ["B3", "B4"]},
+        {"team1": ["A5", "A6"], "team2": ["B5", "B6"]},
+        {"team1": ["A1", "A3"], "team2": ["B4", "B6"]},
+        {"team1": ["A2", "A5"], "team2": ["B1", "B3"]},
+        {"team1": ["A4", "A6"], "team2": ["B2", "B5"]},
+        {"team1": ["A1", "A4"], "team2": ["B3", "B5"]},
+        {"team1": ["A2", "A6"], "team2": ["B1", "B4"]},
+        {"team1": ["A3", "A5"], "team2": ["B2", "B6"]},
+        {"team1": ["A1", "A5"], "team2": ["B2", "B4"]},
+        {"team1": ["A2", "A4"], "team2": ["B3", "B6"]},
+        {"team1": ["A3", "A6"], "team2": ["B1", "B5"]},
+        {"team1": ["A4", "A5"], "team2": ["B1", "B6"]},
+        {"team1": ["A2", "A3"], "team2": ["B4", "B5"]},
+        {"team1": ["A1", "A6"], "team2": ["B2", "B3"]}
+    ],
+    "females_matches": [
+        {"team1": ["AF1", "AF2"], "team2": ["BF1", "BF2"]},
+        {"team1": ["AF3", "AF4"], "team2": ["BF3", "BF4"]},
+        {"team1": ["AF5", "AF6"], "team2": ["BF5", "BF6"]},
+        {"team1": ["AF1", "AF3"], "team2": ["BF2", "BF4"]},
+        {"team1": ["AF2", "AF5"], "team2": ["BF3", "BF6"]},
+        {"team1": ["AF4", "AF6"], "team2": ["BF1", "BF5"]},
+        {"team1": ["AF2", "AF4"], "team2": ["BF1", "BF3"]},
+        {"team1": ["AF3", "AF6"], "team2": ["BF4", "BF6"]},
+        {"team1": ["AF1", "AF5"], "team2": ["BF2", "BF5"]}
+    ],
+    "cross_matches": [
+        {"team1": ["AF2", "AM3"], "team2": ["BF3", "BM3"]},
+        {"team1": ["AF3", "AM1"], "team2": ["BF1", "BM2"]},
+        {"team1": ["AF1", "AM2"], "team2": ["BF2", "BM1"]},
+        {"team1": ["AF3", "AM5"], "team2": ["BF2", "BM6"]},
+        {"team1": ["AF1", "AM6"], "team2": ["BF3", "BM5"]},
+        {"team1": ["AF2", "AM4"], "team2": ["BF1", "BM4"]}
+    ]
+}
