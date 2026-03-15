@@ -2,6 +2,7 @@ jest.mock('../src/utils/fileUtils', () => ({
   DATA_FILE: 'mock-data.json',
   safeReadJson: jest.fn(),
   safeWriteJson: jest.fn(),
+  logToFile: jest.fn(),
 }));
 
 const request = require('supertest');
@@ -121,5 +122,10 @@ describe('PUT / — update match', () => {
   test('returns 404 when match id does not exist', async () => {
     const res = await request(buildApp()).put('/').send({ id: 'no-such-match' });
     expect(res.status).toBe(404);
+  });
+
+  test('returns 400 when payload has no id', async () => {
+    const res = await request(buildApp()).put('/').send({});
+    expect(res.status).toBe(400);
   });
 });

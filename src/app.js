@@ -9,10 +9,12 @@ let expandedPlayers = new Set();
 // Cached admin credentials for this page session (cleared on page refresh)
 let _cachedAdminCredentials = null;
 
+// Main data store — populated by syncDataFromServer() on page load
+let data;
+
 const SERVER_BASE = (function(){
   try {
-    const host = window.location.host;
-    return `${window.location.protocol}//${host}:80`;
+    return `${window.location.protocol}//${window.location.host}`;
   } catch (e) {}
   return 'http://localhost:80';
 })();

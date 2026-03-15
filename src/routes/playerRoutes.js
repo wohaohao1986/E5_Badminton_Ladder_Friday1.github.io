@@ -111,11 +111,7 @@ router.put('/', (req, res) => {
   }
 
   logToFile('Player updated successfully');
-  if (msg && msg.length > 0) {
-    res.status(201).json({ message: msg });
-  } else {
-    res.status(200).json({ message: 'OK' });
-  }
+  res.status(200).json({ message: msg || 'OK' });
 });
 
 // Remove a player
@@ -159,8 +155,8 @@ function changePlayerCategory(playerIndex, newCategory) {
 }
 
 // Helper function to check category counts
-function checkAndPromptGroupingMessage(category) {
-  const playersStore = loadStore();
+function checkAndPromptGroupingMessage(category, store = null) {
+  const playersStore = store || loadStore();
   const activePlayers = playersStore.players.filter(p => p.active && p.category === category);
   const total = activePlayers.length;
 

@@ -1,5 +1,5 @@
 const express = require('express');
-const { DATA_FILE, safeReadJson, safeWriteJson } = require('../utils/fileUtils');
+const { DATA_FILE, safeReadJson, safeWriteJson, logToFile } = require('../utils/fileUtils');
 
 const router = express.Router();
 
@@ -47,11 +47,15 @@ router.post('/', (req, res) => {
 // PUT: Update an existing match
 router.put('/', (req, res) => {
   const payload = req.body;
+  if (!payload || !payload.id) {
+    return res.status(400).json({ error: 'Invalid payload. Required: id' });
+  }
   const matchesStore = safeReadJson(DATA_FILE, { matches: [] });
   const matchIndex = matchesStore.matches.findIndex(m => m.id === payload.id);
   if (matchIndex !== -1) {
     matchesStore.matches[matchIndex] = { ...matchesStore.matches[matchIndex], ...payload };
     safeWriteJson(DATA_FILE, matchesStore);
+    logToFile(`Match ${payload.id} updated with score ${payload.score1} : ${payload.score2}`);
     res.json({ message: 'Match updated successfully', entry: matchesStore.matches[matchIndex] });
   } else {
     res.status(404).json({ error: 'Match not found' });

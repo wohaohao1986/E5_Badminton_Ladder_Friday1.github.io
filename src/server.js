@@ -1,7 +1,6 @@
 const express = require('express');
 const path = require('path');
-const { safeReadJson, safeWriteJson, logToFile } = require('./utils/fileUtils');
-const { DATA_FILE, ADMIN_CONFIG_FILE } = require('./utils/fileUtils');
+const { safeReadJson, safeWriteJson, logToFile, DATA_FILE, ADMIN_CONFIG_FILE } = require('./utils/fileUtils');
 const { currentDateTime, sortPlayersByRanking, generateGroups, generateMatches, generateGroupsAndMatches, finishRound, autoFillScores, calculatePlayerStats, calculateAllPlayerAvgRankInCat, resetGroupLogic, rearrangeGroups } = require('./utils/dataUtils');
 
 // Import route handlers
@@ -112,12 +111,17 @@ app.put('/api/rearrangeGroups', (req, res) => {
 });
 
 app.post('/api/admin', (req, res) => {
-  const adminInfo = safeReadJson(ADMIN_CONFIG_FILE, { username: 'admin', password: 'admin' });
-  logToFile(`Admin login attempt: ${req.body.adminName}`);
-  if(req.body.adminName === adminInfo.admin.username && req.body.adminPassword === adminInfo.admin.password) {
-    res.status(200).json({ authenticated: true });
-  } else {
-    res.status(401).json({ authenticated: false, error: '用户名或密码错误！' });
+  try {
+    const adminInfo = safeReadJson(ADMIN_CONFIG_FILE, { username: 'admin', password: 'admin' });
+    logToFile(`Admin login attempt: ${req.body.adminName}`);
+    if (req.body.adminName === adminInfo.admin.username && req.body.adminPassword === adminInfo.admin.password) {
+      res.status(200).json({ authenticated: true });
+    } else {
+      res.status(401).json({ authenticated: false, error: '用户名或密码错误！' });
+    }
+  } catch (error) {
+    logToFile(`Admin login error: ${error.message}`);
+    res.status(500).json({ authenticated: false, error: '服务器错误' });
   }
 });
 
@@ -143,32 +147,6 @@ app.put('/api/resetGroup', (req, res) => {
     res.status(200).json({ message });
   } catch (error) {
     res.status(error.message === 'Group not found' ? 404 : 500).json({ error: error.message });
-  }
-});
-
-// Endpoint to update match score
-app.put('/api/match', (req, res) => {
-  const payload = req.body;
-  if (!payload || !payload.id) {
-    return res.status(400).json({ error: 'Invalid payload. Required: id' });
-  }
-
-  try {
-    const data = safeReadJson(DATA_FILE, { matches: [] });
-    const matchIndex = data.matches.findIndex(m => m.id === payload.id);
-    
-    if (matchIndex === -1) {
-      return res.status(404).json({ error: 'Match not found' });
-    }
-
-    // Update match with new values
-    data.matches[matchIndex] = { ...data.matches[matchIndex], ...payload };
-    safeWriteJson(DATA_FILE, data);
-    
-    logToFile(`Match ${payload.id} updated with score ${payload.score1} : ${payload.score2}`);
-    res.json({ message: 'Match updated successfully', entry: data.matches[matchIndex] });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
   }
 });
 

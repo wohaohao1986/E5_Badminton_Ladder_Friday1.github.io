@@ -2,7 +2,7 @@ const { DATA_FILE, ADMIN_CONFIG_FILE, safeReadJson, safeWriteJson, logToFile } =
 const CATEGORIES = { huitailang: '灰太狼', xiyangyang: '喜羊羊' };
 const CATEGORY_ORDER = ['huitailang', 'xiyangyang'];
 const DEFAULT_DATA = { players: [], groups: [], matches: [], currentRound: 1, roundHistory: [], matchHistory: [] };
-const currentDateTime = new Date().toLocaleString('en-US', {
+const currentDateTime = () => new Date().toLocaleString('en-US', {
    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
 });
 
@@ -336,6 +336,13 @@ function finishRound() {
 function calculatePlayerStats() {
   const data = loadData();
   data.players.forEach(player => {
+    // Reset before recalculating to prevent double-counting on repeated calls
+    player.numberOfMatchesTwentyOne = 0;
+    player.winsTwentyOne = 0;
+    player.totalNetScoreTwentyOne = 0;
+    player.numberOfMatchesFifteen = 0;
+    player.winsFifteen = 0;
+    player.totalNetScoreFifteen = 0;
     logToFile(`Calculating stats for player: ${player.name}`);
     updatePlayerMatchStats(player, getPlayerMatches(data.matchHistory, player.id), 21);
     updatePlayerMatchStats(player, getPlayerMatches(data.matchHistory, player.id), 15);
@@ -343,26 +350,25 @@ function calculatePlayerStats() {
   safeWriteJson(DATA_FILE, data);
 }
 
-function calculatePlayerAvgRankInCat(playerName) {
-  const data = loadData();
+function _computeAvgRankForPlayer(data, playerName) {
   const player = findPlayer(data, p => p.name === playerName);
   if (!player) return;
-  
+
   const ranks = [];
   let roundPlayed = 0;
   data.roundHistory.forEach(round => {
     const ranking = round.rankings.find(r => r.name === playerName);
     if (!ranking || ranking.category !== player.category) return;
-    
+
     let playerRank = round.rankings.filter(r => r.category === player.category).findIndex(r => r.name === playerName) + 1;
     if (ranking.change === 'promoted') playerRank -= 1;
     else if (ranking.change === 'relegated') playerRank += 1;
     ranks.push(playerRank);
     roundPlayed++;
   });
-  
+
   player.roundPlayed = roundPlayed;
-  
+
   if (roundPlayed > 10) {
     const recentRanks = ranks.slice(-10);
     player.avgRankInCat = parseFloat((recentRanks.reduce((a, r) => a + r, 0) / recentRanks.length).toFixed(2));
@@ -371,13 +377,18 @@ function calculatePlayerAvgRankInCat(playerName) {
   } else {
     player.avgRankInCat = '-';
   }
-  
+}
+
+function calculatePlayerAvgRankInCat(playerName) {
+  const data = loadData();
+  _computeAvgRankForPlayer(data, playerName);
   safeWriteJson(DATA_FILE, data);
 }
 
-const calculateAllPlayerAvgRankInCat = () => { 
-  const data = loadData(); 
-  data.players.forEach(p => calculatePlayerAvgRankInCat(p.name)); 
+const calculateAllPlayerAvgRankInCat = () => {
+  const data = loadData();
+  data.players.forEach(p => _computeAvgRankForPlayer(data, p.name));
+  safeWriteJson(DATA_FILE, data);
 };
 
 // ========== RESET & SCORING ==========

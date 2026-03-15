@@ -16,7 +16,7 @@ jest.mock('../src/utils/dataUtils', () => ({
 const request = require('supertest');
 const express = require('express');
 const { safeReadJson, safeWriteJson } = require('../src/utils/fileUtils');
-const { rerankPlayer } = require('../src/utils/dataUtils');
+const { rerankPlayer, calculatePlayerAvgRankInCat } = require('../src/utils/dataUtils');
 const playerRouter = require('../src/routes/playerRoutes');
 
 const buildApp = () => {
@@ -112,23 +112,53 @@ describe('PUT / — update player', () => {
     expect(res.status).toBe(400);
   });
 
+  test('returns 200 with "OK" when no recognized field is present', async () => {
+    const res = await request(buildApp()).put('/').send({ id: 'player-1234', name: 'New Name' });
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('OK');
+  });
+
   test('calls rerankPlayer when ranking is updated', async () => {
     const res = await request(buildApp()).put('/').send({ id: 'player-1234', ranking: 2 });
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(200);
     expect(rerankPlayer).toHaveBeenCalled();
   });
 
   test('calls rerankPlayer with correct args when deactivating player', async () => {
     const res = await request(buildApp()).put('/').send({ id: 'player-1234', active: false });
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(200);
     expect(rerankPlayer).toHaveBeenCalledWith(0, null, false);
   });
 
   test('calls rerankPlayer with correct args when activating player', async () => {
     mockStore.players = [samplePlayer({ active: false })];
     const res = await request(buildApp()).put('/').send({ id: 'player-1234', active: true });
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(200);
     expect(rerankPlayer).toHaveBeenCalledWith(0, null, true);
+  });
+});
+
+// ─── PUT / — category change ────────────────────────────────────────────────
+describe('PUT / — category change', () => {
+  beforeEach(() => {
+    mockStore.players = [samplePlayer({ category: 'huitailang' })];
+  });
+
+  test('returns 200 and includes old and new category names in message', async () => {
+    const res = await request(buildApp()).put('/').send({ id: 'player-1234', category: 'xiyangyang' });
+    expect(res.status).toBe(200);
+    expect(res.body.message).toContain('灰太狼');
+    expect(res.body.message).toContain('喜羊羊');
+  });
+
+  test('calls calculatePlayerAvgRankInCat for the moved player', async () => {
+    await request(buildApp()).put('/').send({ id: 'player-1234', category: 'xiyangyang' });
+    expect(calculatePlayerAvgRankInCat).toHaveBeenCalledWith('Test Player');
+  });
+
+  test('calls rerankPlayer after category change', async () => {
+    await request(buildApp()).put('/').send({ id: 'player-1234', category: 'xiyangyang' });
+    expect(rerankPlayer).toHaveBeenCalled();
   });
 });
 

@@ -15,12 +15,18 @@ function safeReadJson(filePath, defaultValue) {
     const raw = fs.readFileSync(filePath, 'utf8');
     return JSON.parse(raw || JSON.stringify(defaultValue));
   } catch (err) {
+    logToFile(`Failed to read/parse JSON from ${filePath}: ${err.message}`);
     return defaultValue;
   }
 }
 
 function safeWriteJson(filePath, data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+  } catch (err) {
+    logToFile(`Failed to write JSON to ${filePath}: ${err.message}`);
+    throw err;
+  }
 }
 
 // Logging utility - appends to log file
