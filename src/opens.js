@@ -1,4 +1,7 @@
 
+// Track which opens player rows are expanded
+const expandedOpensPlayers = new Set();
+
 // Opens page functions
 function renderOpens() {
   const container = document.getElementById('opens-list');
@@ -80,18 +83,23 @@ function renderOpensDetail(opens) {
       <div style="margin-bottom:20px;">
         <button onclick="importPlayersFromLadder()" class="btn-primary" style="padding:10px 20px;width:100%;">从Ladder导入选手</button>
       </div>
-      <div style="margin-bottom:15px;">
-        <h3>灰太狼</h3>
-        <div id="players-huitailang" style="display:grid;gap:10px;"></div>
-      </div>
-      <div>
-        <h3>喜羊羊</h3>
-        <div id="players-xiyangyang" style="display:grid;gap:10px;"></div>
+      <div style="display:flex;gap:20px;align-items:flex-start;">
+        <div style="flex:1;">
+          <h3 style="margin-top:0;">灰太狼</h3>
+          <div id="players-huitailang"></div>
+        </div>
+        <div style="flex:1;">
+          <h3 style="margin-top:0;">喜羊羊</h3>
+          <div id="players-xiyangyang"></div>
+        </div>
       </div>
     </div>
     
     <div id="tab-matches-content" style="display:none;">
-      <div id="matches-list" style="display:grid;gap:10px;"></div>
+      <div style="margin-bottom:16px;">
+        <button onclick="generateOpensMatchesAndGroups()" class="btn-primary" style="padding:10px 20px;width:100%;">&#x2699; 生成分组和比赛</button>
+      </div>
+      <div id="matches-list"></div>
     </div>
     
     <div id="tab-scores-content" style="display:none;">
@@ -147,44 +155,211 @@ function switchOpensTab(tabName) {
 // Load players data for opens
 function loadOpenPlayersData(opens) {
   if (!opens.categories) return;
-  
+
   opens.categories.forEach(category => {
-    const categoryName = CATEGORIES[category.id] || category.id;
-    const playersHtml = `<p>该公开赛中${categoryName}的选手列表</p>`;
-    document.getElementById(`players-${category.id}`).innerHTML = playersHtml;
+    const container = document.getElementById(`players-${category.id}`);
+    if (!container) return;
+
+    const males = category.males || [];
+    const females = category.females || [];
+
+    function renderList(players, gender, bg) {
+      let h = '';
+      if (players.length === 0) {
+        h += '<p style="color:#999;margin:0 0 8px 0;">暂无选手</p>';
+      } else {
+        players.forEach((p, i) => {
+          const uid = `${category.id}-${gender}-${p.id}`;
+          const isExpanded = expandedOpensPlayers.has(uid);
+          const icon = isExpanded ? '▼' : '▶';
+          h += `<div style="margin-bottom:4px;background:${bg};border-radius:6px;overflow:hidden;">
+            <div style="padding:5px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;" onclick="toggleOpensPlayerButtons('${uid}', event)">
+              <span style="font-size:13px;width:14px;display:inline-block;text-align:center;">${icon}</span>
+              <span style="font-size:14px;">${i + 1}. ${p.name || p.id}</span>
+            </div>
+            <fieldset style="display:${isExpanded ? 'block' : 'none'};border:none;padding:4px 10px 8px 32px;margin:0;" class="opens-player-btns-${uid}" onclick="event.stopPropagation()">
+              <button onclick="editOpensPlayerRank('${category.id}','${gender}','${p.id}')" class="btn-info" style="padding:3px 8px;font-size:12px;margin-right:5px;">改排名</button>
+              <button onclick="deleteOpensPlayer('${category.id}','${gender}','${p.id}')" class="btn-danger" style="padding:3px 8px;font-size:12px;">删除</button>
+            </fieldset>
+          </div>`;
+        });
+      }
+      return h;
+    }
+
+    let html = '';
+    html += `<div style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <h4 style="margin:0;color:#555;">男子 (${males.length}人)</h4>
+        <button onclick="addOpensPlayer('${category.id}','males')" class="btn-info" style="padding:3px 10px;font-size:12px;">+ 添加</button>
+      </div>
+      ${renderList(males, 'males', '#e8f5e9')}
+    </div>`;
+    html += `<div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <h4 style="margin:0;color:#555;">女子 (${females.length}人)</h4>
+        <button onclick="addOpensPlayer('${category.id}','females')" class="btn-info" style="padding:3px 10px;font-size:12px;">+ 添加</button>
+      </div>
+      ${renderList(females, 'females', '#fce4ec')}
+    </div>`;
+
+    container.innerHTML = html;
   });
+}
+
+function toggleOpensPlayerButtons(uid, event) {
+  event.stopPropagation();
+  if (expandedOpensPlayers.has(uid)) {
+    expandedOpensPlayers.delete(uid);
+  } else {
+    expandedOpensPlayers.add(uid);
+  }
+  loadOpenPlayersData(window.currentOpens);
+}
+
+async function addOpensPlayer(categoryId, gender) {
+  const name = prompt('请输入选手姓名：');
+  if (!name || !name.trim()) return;
+  const result = await sendAuthenticatedRequest('/api/opens/player/add', {
+    opensId: window.currentOpens.id,
+    categoryId,
+    gender,
+    name: name.trim()
+  });
+  if (result) {
+    window.currentOpens = result;
+    loadOpenPlayersData(result);
+  }
+}
+
+async function editOpensPlayerRank(categoryId, gender, playerId) {
+  const cat = window.currentOpens.categories.find(c => c.id === categoryId);
+  const arr = cat ? (cat[gender] || []) : [];
+  const currentPos = arr.findIndex(p => p.id === playerId) + 1;
+  const input = prompt(`当前位置: ${currentPos}，请输入新位置（1-${arr.length}）：`);
+  if (!input) return;
+  const position = parseInt(input);
+  if (isNaN(position) || position < 1 || position > arr.length) { alert('无效的位置'); return; }
+  const result = await sendAuthenticatedRequest('/api/opens/player/rank', {
+    opensId: window.currentOpens.id,
+    categoryId,
+    gender,
+    playerId,
+    position
+  });
+  if (result) {
+    window.currentOpens = result;
+    loadOpenPlayersData(result);
+  }
+}
+
+async function deleteOpensPlayer(categoryId, gender, playerId) {
+  if (!confirm('确认删除该选手？')) return;
+  const result = await sendAuthenticatedRequest('/api/opens/player/delete', {
+    opensId: window.currentOpens.id,
+    categoryId,
+    gender,
+    playerId
+  });
+  if (result) {
+    window.currentOpens = result;
+    loadOpenPlayersData(result);
+  }
 }
 
 // Load matches data for opens
 function loadOpenMatchesData(opens) {
   const container = document.getElementById('matches-list');
-  
+  let html = '';
+
+  // Groups summary
+  if (opens.groups) {
+    const renderGroupSection = (groupPairs, label) => {
+      if (!groupPairs || groupPairs.length === 0) return '';
+      let h = `<h4 style="margin:0 0 8px 0;color:#444;">${label}分组</h4>`;
+      groupPairs.forEach((g, i) => {
+        h += `<div style="margin-bottom:8px;border-radius:8px;overflow:hidden;border:1px solid #ddd;">
+          <div style="padding:5px 10px;background:#e0e0e0;font-size:13px;font-weight:bold;">第${i + 1}组</div>
+          <div style="display:flex;">
+            <div style="flex:1;padding:8px 12px;background:#e8eaf6;border-right:2px solid #fff;">
+              <div style="font-size:11px;font-weight:bold;color:#5c6bc0;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">灰太狼</div>
+              ${(g.ht || []).map((p, j) => `<div style="font-size:13px;padding:2px 0;">${j + 1}. ${p.name}</div>`).join('')}
+            </div>
+            <div style="flex:1;padding:8px 12px;background:#fce4ec;">
+              <div style="font-size:11px;font-weight:bold;color:#e91e8c;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">喜羊羊</div>
+              ${(g.xy || []).map((p, j) => `<div style="font-size:13px;padding:2px 0;">${j + 1}. ${p.name}</div>`).join('')}
+            </div>
+          </div>
+        </div>`;
+      });
+      return h;
+    };
+    html += '<div style="margin-bottom:20px;">';
+    html += renderGroupSection(opens.groups.males, '男子');
+    html += renderGroupSection(opens.groups.females, '女子');
+    html += '</div>';
+  }
+
   if (!opens.matches || opens.matches.length === 0) {
-    container.innerHTML = '<p>暂无比赛</p>';
+    html += '<p style="color:#999;">暂无比赛，请先生成</p>';
+    container.innerHTML = html;
+    const scoreSelect = document.getElementById('opens-score-match');
+    if (scoreSelect) scoreSelect.innerHTML = '<option value="">—— 请选择 ——</option>';
     return;
   }
-  
-  let html = '';
-  opens.matches.forEach(match => {
-    const status = match.completed ? '已完成' : '进行中';
-    const score = match.completed ? `${match.score1} : ${match.score2}` : '待比赛';
-    html += `<div style="padding:10px;background:#f5f5f5;border-radius:6px;">
-      <p><strong>${status}</strong></p>
-      <p>${match.team1 ? match.team1.join(' / ') : '队伍1'} vs ${match.team2 ? match.team2.join(' / ') : '队伍2'}</p>
-      <p><strong>${score}</strong></p>
-    </div>`;
+
+  const typeLabel = { males: '男子', females: '女子', cross: '混合' };
+  const typeBg   = { males: '#e3f2fd',  females: '#fce4ec', cross: '#f3e5f5' };
+
+  // Collect ordered sections
+  const sections = [];
+  const keyIndex = new Map();
+  opens.matches.forEach((match, idx) => {
+    const key = `${match.type || ''}-${match.group || ''}`;
+    if (!keyIndex.has(key)) { keyIndex.set(key, sections.length); sections.push({ type: match.type, group: match.group, indices: [] }); }
+    sections[keyIndex.get(key)].indices.push(idx);
   });
-  
+
+  sections.forEach(sec => {
+    const label = (typeLabel[sec.type] || sec.type || '比赛') + (sec.group ? ` 第${sec.group}组` : '');
+    const bg = typeBg[sec.type] || '#f5f5f5';
+    const done = sec.indices.filter(i => opens.matches[i].completed).length;
+    html += `<h4 style="margin:16px 0 6px 0;color:#555;">${label} — ${done}/${sec.indices.length} 已完成</h4>`;
+    sec.indices.forEach(idx => {
+      const m = opens.matches[idx];
+      const scoreText = m.completed ? `${m.score1} : ${m.score2}` : '未完成';
+      const scoreColor = m.completed ? '#4CAF50' : '#aaa';
+      html += `<div style="padding:7px 10px;margin-bottom:3px;background:${bg};border-radius:6px;font-size:13px;display:flex;justify-content:space-between;align-items:center;">
+        <span>${(m.team1 || []).join(' / ')} <strong>vs</strong> ${(m.team2 || []).join(' / ')}</span>
+        <span style="color:${scoreColor};font-size:12px;min-width:60px;text-align:right;">${scoreText}</span>
+      </div>`;
+    });
+  });
+
   container.innerHTML = html;
-  
+
   // Populate score dropdown
   const scoreSelect = document.getElementById('opens-score-match');
-  scoreSelect.innerHTML = '<option value="">-- 请选择 --</option>';
-  opens.matches.forEach((match, index) => {
-    if (!match.completed) {
-      scoreSelect.innerHTML += `<option value="${index}">${match.team1 ? match.team1.join(' / ') : '队伍1'} vs ${match.team2 ? match.team2.join(' / ') : '队伍2'}</option>`;
-    }
-  });
+  if (scoreSelect) {
+    scoreSelect.innerHTML = '<option value="">—— 请选择 ——</option>';
+    opens.matches.forEach((match, index) => {
+      if (!match.completed) {
+        const sec = `[${typeLabel[match.type] || ''}G${match.group || ''}]`;
+        scoreSelect.innerHTML += `<option value="${index}">${sec} ${(match.team1 || []).join('/')} vs ${(match.team2 || []).join('/')}</option>`;
+      }
+    });
+  }
+}
+
+async function generateOpensMatchesAndGroups() {
+  if (!window.currentOpens) { alert('请先选择公开赛'); return; }
+  if (!confirm('生成分组和比赛将覆盖现有数据，确认继续？')) return;
+  const result = await sendAuthenticatedRequest('/api/opens/generateMatchesAndGroups', { opensId: window.currentOpens.id });
+  if (result && result.matches) {
+    window.currentOpens = result;
+    loadOpenMatchesData(result);
+    alert(`生成成功！共 ${result.matches.length} 场比赛`);
+  }
 }
 
 // Update opens score form
@@ -255,14 +430,21 @@ async function submitNewOpens(event) {
 }
 
 async function importPlayersFromLadder() {
-    const result = await sendAuthenticatedRequest('api/opens/importPlayers');
-    if (result) {
-      alert('选手导入成功！');
-      await syncDataFromServer();
-      renderOpens();
-    } else {
-      alert('选手导入失败');
+  if (!window.currentOpens) {
+    alert('请先选择公开赛');
+    return;
+  }
+  const result = await sendAuthenticatedRequest('/api/opens/importPlayers', { opensId: window.currentOpens.id });
+  if (result) {
+    alert('选手导入成功！');
+    const refreshed = await getFromServer(`/api/opens/${window.currentOpens.id}`);
+    if (refreshed) {
+      window.currentOpens = refreshed;
+      loadOpenPlayersData(refreshed);
     }
+  } else {
+    alert('选手导入失败');
+  }
 }
 
 // Display opens list
