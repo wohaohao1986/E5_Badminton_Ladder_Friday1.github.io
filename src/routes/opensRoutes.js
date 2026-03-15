@@ -174,6 +174,21 @@ router.put('/generateMatchesAndGroups', (req, res) => {
   }
 });
 
+// PUT: Update an existing opens (e.g. save match scores)
+router.put('/:id', (req, res) => {
+  const opensId = req.params.id;
+  const payload = req.body;
+  if (!payload || Object.keys(payload).length === 0)
+    return res.status(400).json({ error: 'Empty payload' });
+  const store = loadStore();
+  const idx = (store.opens || []).findIndex(o => o.id === opensId);
+  if (idx === -1) return res.status(404).json({ error: 'Opens not found' });
+  store.opens[idx] = { ...store.opens[idx], ...payload };
+  saveStore(store);
+  logToFile(`Opens ${opensId} updated`);
+  res.json(store.opens[idx]);
+});
+
 // DELETE: Delete an opens
 router.delete('/:id', (req, res) => {
   const store = loadStore();

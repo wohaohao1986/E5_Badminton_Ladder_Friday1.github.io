@@ -11,13 +11,7 @@ let _cachedAdminCredentials = null;
 
 // Main data store — populated by syncDataFromServer() on page load
 let data;
-
-const SERVER_BASE = (function(){
-  try {
-    return `${window.location.protocol}//${window.location.host}`;
-  } catch (e) {}
-  return 'http://localhost:80';
-})();
+let dataOpens;
 
 // Initialize website
 async function init() {
@@ -111,11 +105,11 @@ async function sendAuthenticatedRequest(endpoint, payload) {
 
 async function syncDataFromServer() {
   data = await getFromServer('/api/main');
+  dataOpens = await getFromServer('/api/opens');
 }
 
 // Navigation and rendering pages
 function showPage(page) {
-  ['home', 'match', 'score', 'ranking', 'history', 'admin', 'opens'].forEach(p => {
   ['home', 'match', 'score', 'ranking', 'history', 'admin', 'opens'].forEach(p => {
     document.getElementById(`page-${p}`).classList.add('hidden');
     document.getElementById(`nav-${p}`).classList.remove('active');
@@ -128,7 +122,6 @@ function showPage(page) {
   if (page === 'ranking') renderRanking();
   if (page === 'history') renderHistory();
   if (page === 'admin') renderAdmin();
-  if (page === 'opens') renderOpens();
   if (page === 'opens') renderOpens();
 }
 
