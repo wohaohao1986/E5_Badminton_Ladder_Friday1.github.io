@@ -233,44 +233,112 @@ function renderScore() {
   document.getElementById('completed-matches').innerHTML = html || '<p>暂无已完成比赛</p>';
 }
 
+const rankingSortState = {};
+
+function sortRankingBy(cat, field) {
+  if (!rankingSortState[cat]) rankingSortState[cat] = { field: 'ranking', dir: 'asc' };
+  if (rankingSortState[cat].field === field) {
+    rankingSortState[cat].dir = rankingSortState[cat].dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    rankingSortState[cat].field = field;
+    rankingSortState[cat].dir = 'asc';
+  }
+  renderRanking();
+}
+
 function renderRanking() {
   const container = document.getElementById('ranking-list');
   let html = '';
-  
+
   Object.keys(CATEGORIES).forEach(cat => {
-    const catPlayers = data.players.filter(p => p.category === cat).sort((a, b) => a.ranking - b.ranking);
+    const catPlayers = data.players.filter(p => p.category === cat).sort((a, b) => {
+      const ra = typeof a.ranking === 'number' ? a.ranking : Infinity;
+      const rb = typeof b.ranking === 'number' ? b.ranking : Infinity;
+      return ra - rb;
+    });
     if (catPlayers.length === 0) return;
-    
+
+    const state = rankingSortState[cat] || { field: 'ranking', dir: 'asc' };
+    const indicator = (field) => {
+      if (state.field === field) return state.dir === 'asc' ? ' <span style="color:#4CAF50;font-size:11px;">▲</span>' : ' <span style="color:#4CAF50;font-size:11px;">▼</span>';
+      return ' <span style="color:#bbb;font-size:11px;">⇅</span>';
+    };
+
+    // Sort a display-only copy — original data is never mutated
+    const displayPlayers = [...catPlayers].sort((a, b) => {
+      const dir = state.dir === 'asc' ? 1 : -1;
+      if (state.field === 'avgRank') {
+        const ra = typeof a.avgRankInCat === 'number' ? a.avgRankInCat : Infinity;
+        const rb = typeof b.avgRankInCat === 'number' ? b.avgRankInCat : Infinity;
+        return (ra - rb) * dir;
+      }
+      if (state.field === 'roundPlayed') {
+        return ((a.roundPlayed || 0) - (b.roundPlayed || 0)) * dir;
+      }
+      // default: ranking
+      const ra = typeof a.ranking === 'number' ? a.ranking : Infinity;
+      const rb = typeof b.ranking === 'number' ? b.ranking : Infinity;
+      return (ra - rb) * dir;
+    });
+
+    const thSort = 'padding:7px 8px;text-align:center;border:1px solid #ddd;cursor:pointer;user-select:none;background-color:#f0f7f0;white-space:nowrap;font-size:13px;';
+    const thSortAttrs = `onmouseover="this.style.backgroundColor='#d8eed8'" onmouseout="this.style.backgroundColor='#f0f7f0'"`;
+    const thFixed = 'padding:7px 8px;text-align:center;border:1px solid #ddd;white-space:nowrap;font-size:13px;';
+    const thLeft  = 'padding:7px 8px;text-align:left;border:1px solid #ddd;white-space:nowrap;font-size:13px;';
+    const thSub   = 'padding:4px 6px;text-align:center;border:1px solid #ddd;font-size:12px;white-space:nowrap;';
+    const td      = 'padding:6px 8px;text-align:center;font-size:13px;';
+    const tdName  = 'padding:6px 8px;text-align:left;font-size:13px;white-space:nowrap;';
+
     html += `<h2 style="color:#4CAF50;margin-top:20px;margin-bottom:15px;">${CATEGORIES[cat]}</h2>`;
-    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;"><thead><tr style="background-color:#f5f5f5;"><th style="padding:10px;text-align:center;border:1px solid #ddd;">排名</th><th style="padding:10px;text-align:left;border:1px solid #ddd;">选手</th><th colspan="3" style="padding:10px;text-align:center;border:1px solid #ddd;background-color:#e8f5e9;">21分制</th><th colspan="3" style="padding:10px;text-align:center;border:1px solid #ddd;background-color:#e3f2fd;">15分制</th><th style="padding:10px;text-align:center;border:1px solid #ddd;">平均排名\n(最近10轮)</th><th style="padding:10px;text-align:center;border:1px solid #ddd;">参赛轮次</th><th style="padding:10px;text-align:center;border:1px solid #ddd;">状态</th></tr><tr style="background-color:#f5f5f5;"><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th><th style="padding:5px;text-align:left;border:1px solid #ddd;"></th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">场数</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">胜</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">净分</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">场数</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">胜</th><th style="padding:5px;text-align:center;border:1px solid #ddd;font-size:12px;">净分</th><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th><th style="padding:5px;text-align:center;border:1px solid #ddd;"></th></tr></thead><tbody>';
-    catPlayers.forEach((p, index) => {
+    html += `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><table style="width:100%;min-width:560px;border-collapse:collapse;margin-bottom:20px;"><thead>
+      <tr style="background-color:#f5f5f5;">
+        <th style="${thSort}" ${thSortAttrs} onclick="sortRankingBy('${cat}','ranking')">当前排名${indicator('ranking')}</th>
+        <th style="${thLeft}">选手</th>
+        <th style="${thSort}" ${thSortAttrs} onclick="sortRankingBy('${cat}','avgRank')">平均排名<br>(最近10轮)${indicator('avgRank')}</th>
+        <th style="${thSort}" ${thSortAttrs} onclick="sortRankingBy('${cat}','roundPlayed')">参赛轮次${indicator('roundPlayed')}</th>
+        <th colspan="3" style="${thFixed}background-color:#e8f5e9;">21分制</th>
+        <th colspan="3" style="${thFixed}background-color:#e3f2fd;">15分制</th>
+        <th style="${thFixed}">状态</th>
+      </tr>
+      <tr style="background-color:#f5f5f5;">
+        <th style="${thSub}"></th>
+        <th style="${thSub}"></th>
+        <th style="${thSub}"></th>
+        <th style="${thSub}"></th>
+        <th style="${thSub}">场数</th><th style="${thSub}">胜</th><th style="${thSub}">净分</th>
+        <th style="${thSub}">场数</th><th style="${thSub}">胜</th><th style="${thSub}">净分</th>
+        <th style="${thSub}"></th>
+      </tr></thead><tbody>`;
+
+    displayPlayers.forEach(p => {
       const statusClass = p.active ? '' : 'player-inactive';
       const statusText = p.active ? '参赛' : '未参赛';
+      const rankDisplay = typeof p.ranking === 'number' ? p.ranking : '-';
+      const avgRankInCat = typeof p.avgRankInCat === 'number' ? p.avgRankInCat : '-';
+      const roundPlayed = p.roundPlayed || 0;
       const numberOfMatchesTwentyOne = p.numberOfMatchesTwentyOne || 0;
       const winsTwentyOne = p.winsTwentyOne || 0;
       const totalNetScoreTwentyOne = p.totalNetScoreTwentyOne || 0;
       const numberOfMatchesFifteen = p.numberOfMatchesFifteen || 0;
       const winsFifteen = p.winsFifteen || 0;
       const totalNetScoreFifteen = p.totalNetScoreFifteen || 0;
-      const avgRankInCat = p.avgRankInCat || 0;
-      const roundPlayed = p.roundPlayed || 0;
       html += `<tr class="${statusClass}" style="border-bottom:1px solid #ddd;">
-        <td style="padding:10px;text-align:center;">#${index + 1}</td>
-        <td style="padding:10px;">${p.name}</td>
-        <td style="padding:10px;text-align:center;">${numberOfMatchesTwentyOne}</td>
-        <td style="padding:10px;text-align:center;">${winsTwentyOne}</td>
-        <td style="padding:10px;text-align:center;">${totalNetScoreTwentyOne}</td>
-        <td style="padding:10px;text-align:center;">${numberOfMatchesFifteen}</td>
-        <td style="padding:10px;text-align:center;">${winsFifteen}</td>
-        <td style="padding:10px;text-align:center;">${totalNetScoreFifteen}</td>
-        <td style="padding:10px;text-align:center;">${avgRankInCat}</td>
-        <td style="padding:10px;text-align:center;">${roundPlayed}</td>
-        <td style="padding:10px;text-align:center;color:#666;">${statusText}</td>
+        <td style="${td}">#${rankDisplay}</td>
+        <td style="${tdName}">${p.name}</td>
+        <td style="${td}">${avgRankInCat}</td>
+        <td style="${td}">${roundPlayed}</td>
+        <td style="${td}">${numberOfMatchesTwentyOne}</td>
+        <td style="${td}">${winsTwentyOne}</td>
+        <td style="${td}">${totalNetScoreTwentyOne}</td>
+        <td style="${td}">${numberOfMatchesFifteen}</td>
+        <td style="${td}">${winsFifteen}</td>
+        <td style="${td}">${totalNetScoreFifteen}</td>
+        <td style="${td}color:#666;">${statusText}</td>
       </tr>`;
     });
-    html += '</tbody></table>';
+    html += '</tbody></table></div>';
   });
-  
+
   container.innerHTML = html || '<p>暂无选手</p>';
 }
 

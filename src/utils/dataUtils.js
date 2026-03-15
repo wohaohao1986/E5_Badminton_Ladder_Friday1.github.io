@@ -142,9 +142,12 @@ function findClosestPlayerInRanking(ranking, positions, activePlayersInCat) {
 }
 
 function calculateTargetRank(player, lastRoundRanking, activePlayersInCat, data) {
+  // Players with no average rank (never played) go to the end of the list
+  if (typeof player.avgRankInCat !== 'number') return activePlayersInCat.length + 1;
+
   let targetRank = Math.ceil(player.avgRankInCat);
   
-  if (!lastRoundRanking || lastRoundRanking.length === 0 || typeof player.avgRankInCat !== 'number') return targetRank;
+  if (!lastRoundRanking || lastRoundRanking.length === 0) return targetRank;
   
   const floorPos = Math.floor(player.avgRankInCat) - 1;
   const ceilPos = Math.ceil(player.avgRankInCat) - 1;

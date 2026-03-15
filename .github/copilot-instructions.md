@@ -109,6 +109,7 @@ try {
 - Test edge cases and error conditions
 - Verify data integrity after operations
 - Test with various player counts (4, 8, 12, 16+ players)
+- **When a new feature is added, write corresponding tests for it and run all tests (`npm test`) to verify the functionality of the entire system**
 
 ## Algorithm Notes
 
@@ -135,6 +136,7 @@ try {
 - **Layouts:** Use Flexbox for responsive design
 - **Modals:** Use overlay pattern with `.modal-overlay` and `.modal-content` classes
 - **Accessibility:** Ensure buttons are clickable with good contrast
+- **Responsive Design:** When working on UI changes, make sure phone users and computer users have similar views — wrap wide tables in `overflow-x:auto` scroll containers, use compact padding on mobile, and avoid fixed widths that break small screens
 
 ## Common Tasks
 
