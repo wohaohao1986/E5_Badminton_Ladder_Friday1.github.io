@@ -22,8 +22,8 @@ const sampleOpens = (overrides = {}) => ({
   name: 'TestOpens',
   date: '2026-06-01',
   categories: [
-    { id: 'huitailang', males: [], females: [] },
-    { id: 'xiyangyang', males: [], females: [] },
+    { id: 'A', males: [], females: [] },
+    { id: 'B', males: [], females: [] },
   ],
   matches: [],
   ...overrides,
@@ -101,11 +101,11 @@ describe('POST / — add new opens', () => {
     expect(mockOpensStore.opens[0].id).toBe('Summer-2026-08-01');
   });
 
-  test('initialises huitailang and xiyangyang categories with empty player lists', async () => {
+  test('initialises Team A and Team B categories with empty player lists', async () => {
     await request(buildApp()).post('/').send({ name: 'Summer', date: '2026-08-01' });
     const o = mockOpensStore.opens[0];
-    const ht = o.categories.find(c => c.id === 'huitailang');
-    const xy = o.categories.find(c => c.id === 'xiyangyang');
+    const ht = o.categories.find(c => c.id === 'A');
+    const xy = o.categories.find(c => c.id === 'B');
     expect(ht.males).toEqual([]);
     expect(xy.females).toEqual([]);
   });
@@ -196,18 +196,18 @@ describe('PUT /player/add — add a player to a category/gender', () => {
 
   test('adds the player to the correct category and gender list', async () => {
     const res = await request(buildApp()).put('/player/add').send({
-      opensId: 'TestOpens-2026-06-01', categoryId: 'huitailang', gender: 'males', name: 'Alice',
+      opensId: 'TestOpens-2026-06-01', categoryId: 'A', gender: 'males', name: 'Alice',
     });
     expect(res.status).toBe(200);
-    const htCat = res.body.categories.find(c => c.id === 'huitailang');
+    const htCat = res.body.categories.find(c => c.id === 'A');
     expect(htCat.males.some(p => p.name === 'Alice')).toBe(true);
   });
 
   test('persists the new player to the store', async () => {
     await request(buildApp()).put('/player/add').send({
-      opensId: 'TestOpens-2026-06-01', categoryId: 'xiyangyang', gender: 'females', name: 'Bob',
+      opensId: 'TestOpens-2026-06-01', categoryId: 'B', gender: 'females', name: 'Bob',
     });
-    const xyCat = mockOpensStore.opens[0].categories.find(c => c.id === 'xiyangyang');
+    const xyCat = mockOpensStore.opens[0].categories.find(c => c.id === 'B');
     expect(xyCat.females.some(p => p.name === 'Bob')).toBe(true);
   });
 
@@ -218,7 +218,7 @@ describe('PUT /player/add — add a player to a category/gender', () => {
 
   test('returns 404 when opens is not found', async () => {
     const res = await request(buildApp()).put('/player/add').send({
-      opensId: 'no-such-id', categoryId: 'huitailang', gender: 'males', name: 'Alice',
+      opensId: 'no-such-id', categoryId: 'A', gender: 'males', name: 'Alice',
     });
     expect(res.status).toBe(404);
   });
@@ -232,7 +232,7 @@ describe('PUT /player/add — add a player to a category/gender', () => {
 
   test('returns 400 for invalid gender', async () => {
     const res = await request(buildApp()).put('/player/add').send({
-      opensId: 'TestOpens-2026-06-01', categoryId: 'huitailang', gender: 'robots', name: 'Alice',
+      opensId: 'TestOpens-2026-06-01', categoryId: 'A', gender: 'robots', name: 'Alice',
     });
     expect(res.status).toBe(400);
   });
@@ -244,7 +244,7 @@ describe('PUT /player/rank — move a player to a new position', () => {
     mockOpensStore.opens = [sampleOpens({
       categories: [
         {
-          id: 'huitailang',
+          id: 'A',
           males: [
             { id: 'p1', name: 'Alice' },
             { id: 'p2', name: 'Bob' },
@@ -252,33 +252,33 @@ describe('PUT /player/rank — move a player to a new position', () => {
           ],
           females: [],
         },
-        { id: 'xiyangyang', males: [], females: [] },
+        { id: 'B', males: [], females: [] },
       ],
     })];
   });
 
   test('moves player to the requested position', async () => {
     const res = await request(buildApp()).put('/player/rank').send({
-      opensId: 'TestOpens-2026-06-01', categoryId: 'huitailang', gender: 'males',
+      opensId: 'TestOpens-2026-06-01', categoryId: 'A', gender: 'males',
       playerId: 'p3', position: 1,
     });
     expect(res.status).toBe(200);
-    const htCat = res.body.categories.find(c => c.id === 'huitailang');
+    const htCat = res.body.categories.find(c => c.id === 'A');
     expect(htCat.males[0].id).toBe('p3');
   });
 
   test('persists the reorder to the store', async () => {
     await request(buildApp()).put('/player/rank').send({
-      opensId: 'TestOpens-2026-06-01', categoryId: 'huitailang', gender: 'males',
+      opensId: 'TestOpens-2026-06-01', categoryId: 'A', gender: 'males',
       playerId: 'p1', position: 3,
     });
-    const htCat = mockOpensStore.opens[0].categories.find(c => c.id === 'huitailang');
+    const htCat = mockOpensStore.opens[0].categories.find(c => c.id === 'A');
     expect(htCat.males[2].id).toBe('p1');
   });
 
   test('returns 404 when player is not found', async () => {
     const res = await request(buildApp()).put('/player/rank').send({
-      opensId: 'TestOpens-2026-06-01', categoryId: 'huitailang', gender: 'males',
+      opensId: 'TestOpens-2026-06-01', categoryId: 'A', gender: 'males',
       playerId: 'no-such-player', position: 1,
     });
     expect(res.status).toBe(404);
@@ -291,11 +291,11 @@ describe('PUT /player/rank — move a player to a new position', () => {
 
   test('clamps position to the valid range', async () => {
     const res = await request(buildApp()).put('/player/rank').send({
-      opensId: 'TestOpens-2026-06-01', categoryId: 'huitailang', gender: 'males',
+      opensId: 'TestOpens-2026-06-01', categoryId: 'A', gender: 'males',
       playerId: 'p1', position: 999,
     });
     expect(res.status).toBe(200);
-    const htCat = res.body.categories.find(c => c.id === 'huitailang');
+    const htCat = res.body.categories.find(c => c.id === 'A');
     expect(htCat.males[htCat.males.length - 1].id).toBe('p1');
   });
 });
@@ -305,32 +305,32 @@ describe('PUT /player/delete — remove a player', () => {
   beforeEach(() => {
     mockOpensStore.opens = [sampleOpens({
       categories: [
-        { id: 'huitailang', males: [{ id: 'p1', name: 'Alice' }], females: [] },
-        { id: 'xiyangyang', males: [], females: [] },
+        { id: 'A', males: [{ id: 'p1', name: 'Alice' }], females: [] },
+        { id: 'B', males: [], females: [] },
       ],
     })];
   });
 
   test('removes the player and returns the updated opens', async () => {
     const res = await request(buildApp()).put('/player/delete').send({
-      opensId: 'TestOpens-2026-06-01', categoryId: 'huitailang', gender: 'males', playerId: 'p1',
+      opensId: 'TestOpens-2026-06-01', categoryId: 'A', gender: 'males', playerId: 'p1',
     });
     expect(res.status).toBe(200);
-    const htCat = res.body.categories.find(c => c.id === 'huitailang');
+    const htCat = res.body.categories.find(c => c.id === 'A');
     expect(htCat.males.find(p => p.id === 'p1')).toBeUndefined();
   });
 
   test('persists the deletion to the store', async () => {
     await request(buildApp()).put('/player/delete').send({
-      opensId: 'TestOpens-2026-06-01', categoryId: 'huitailang', gender: 'males', playerId: 'p1',
+      opensId: 'TestOpens-2026-06-01', categoryId: 'A', gender: 'males', playerId: 'p1',
     });
-    const htCat = mockOpensStore.opens[0].categories.find(c => c.id === 'huitailang');
+    const htCat = mockOpensStore.opens[0].categories.find(c => c.id === 'A');
     expect(htCat.males).toHaveLength(0);
   });
 
   test('returns 404 when player is not found', async () => {
     const res = await request(buildApp()).put('/player/delete').send({
-      opensId: 'TestOpens-2026-06-01', categoryId: 'huitailang', gender: 'males', playerId: 'no-such',
+      opensId: 'TestOpens-2026-06-01', categoryId: 'A', gender: 'males', playerId: 'no-such',
     });
     expect(res.status).toBe(404);
   });
@@ -342,7 +342,7 @@ describe('PUT /player/delete — remove a player', () => {
 
   test('returns 404 when opens is not found', async () => {
     const res = await request(buildApp()).put('/player/delete').send({
-      opensId: 'no-such-opens', categoryId: 'huitailang', gender: 'males', playerId: 'p1',
+      opensId: 'no-such-opens', categoryId: 'A', gender: 'males', playerId: 'p1',
     });
     expect(res.status).toBe(404);
   });
@@ -378,27 +378,30 @@ describe('PUT /importPlayers — import players from ladder', () => {
     expect(res.status).toBe(404);
   });
 
-  test('distributes huitailang players into htMales (even) and xyMales (odd)', async () => {
+  test('distributes huitailang players into Team A males (idx 0,2) and Team B males (idx 1,3)', async () => {
     const res = await request(buildApp()).put('/importPlayers').send({ opensId: 'TestOpens-2026-06-01' });
     expect(res.status).toBe(200);
-    // htMales: h1 (idx 0), h3 (idx 2)
-    expect(res.body.htMales.map(p => p.id)).toEqual(['h1', 'h3']);
-    // xyMales: h2 (idx 1), h4 (idx 3)
-    expect(res.body.xyMales.map(p => p.id)).toEqual(['h2', 'h4']);
+    const teamA = res.body.teams.find(t => t.id === 'A');
+    const teamB = res.body.teams.find(t => t.id === 'B');
+    // Team A males: h1 (idx 0), h3 (idx 2)
+    expect(teamA.males.map(p => p.id)).toEqual(['h1', 'h3']);
+    // Team B males: h2 (idx 1), h4 (idx 3)
+    expect(teamB.males.map(p => p.id)).toEqual(['h2', 'h4']);
   });
 
-  test('distributes xiyangyang players into htFemales (odd) and xyFemales (even)', async () => {
+  test('distributes xiyangyang players into Team A females (odd offset) and Team B females (even offset)', async () => {
     const res = await request(buildApp()).put('/importPlayers').send({ opensId: 'TestOpens-2026-06-01' });
-    // htFemales: x2 (idx 1), x4 (idx 3)
-    expect(res.body.htFemales.map(p => p.id)).toEqual(['x2', 'x4']);
-    // xyFemales: x1 (idx 0), x3 (idx 2)
-    expect(res.body.xyFemales.map(p => p.id)).toEqual(['x1', 'x3']);
+    const teamA = res.body.teams.find(t => t.id === 'A');
+    const teamB = res.body.teams.find(t => t.id === 'B');
+    // With 2 teams and offset 1: team A gets idx 1,3 (x2,x4), team B gets idx 0,2 (x1,x3)
+    expect(teamA.females.map(p => p.id)).toEqual(['x2', 'x4']);
+    expect(teamB.females.map(p => p.id)).toEqual(['x1', 'x3']);
   });
 
   test('persists the imported players to the opens store', async () => {
     await request(buildApp()).put('/importPlayers').send({ opensId: 'TestOpens-2026-06-01' });
-    const htCat = mockOpensStore.opens[0].categories.find(c => c.id === 'huitailang');
-    const xyCat = mockOpensStore.opens[0].categories.find(c => c.id === 'xiyangyang');
+    const htCat = mockOpensStore.opens[0].categories.find(c => c.id === 'A');
+    const xyCat = mockOpensStore.opens[0].categories.find(c => c.id === 'B');
     expect(htCat.males.length).toBeGreaterThan(0);
     expect(xyCat.males.length).toBeGreaterThan(0);
   });
@@ -406,8 +409,109 @@ describe('PUT /importPlayers — import players from ladder', () => {
   test('excludes inactive players', async () => {
     mockLadderStore.players.push(samplePlayer('h5', 'HT-inactive', 'huitailang', 5, false));
     const res = await request(buildApp()).put('/importPlayers').send({ opensId: 'TestOpens-2026-06-01' });
-    const allImported = [...res.body.htMales, ...res.body.xyMales];
+    const allImported = res.body.teams.flatMap(t => t.males);
     expect(allImported.find(p => p.id === 'h5')).toBeUndefined();
+  });
+
+  test('splits into 3 teams when numTeams=3', async () => {
+    // Add 2 extra huitailang players so each team gets exactly 2 males (A=[0,3], B=[1,4], C=[2,5])
+    mockLadderStore.players.push(
+      samplePlayer('h5', 'HT-5', 'huitailang', 5),
+      samplePlayer('h6', 'HT-6', 'huitailang', 6)
+    );
+    const res = await request(buildApp()).put('/importPlayers').send({ opensId: 'TestOpens-2026-06-01', numTeams: 3 });
+    expect(res.status).toBe(200);
+    expect(res.body.numTeams).toBe(3);
+    const allMales = res.body.teams.flatMap(t => t.males);
+    expect(allMales).toHaveLength(6);
+    // Each team should have exactly 2 males
+    res.body.teams.forEach(t => expect(t.males).toHaveLength(2));
+    // All 6 huitailang players should be present
+    const ids = allMales.map(p => p.id).sort();
+    expect(ids).toEqual(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+    // store should have 3 categories
+    expect(mockOpensStore.opens[0].categories).toHaveLength(3);
+    expect(mockOpensStore.opens[0].categories.map(c => c.id)).toEqual(['A', 'B', 'C']);
+  });
+
+  test('clamps numTeams above 6 down to 6', async () => {
+    const res = await request(buildApp()).put('/importPlayers').send({ opensId: 'TestOpens-2026-06-01', numTeams: 10 });
+    expect(res.status).toBe(200);
+    expect(res.body.numTeams).toBe(6); // clamped to max 6
+  });
+});
+
+// ─── PUT /generatePairPlan ───────────────────────────────────────────────────
+describe('PUT /generatePairPlan — generate pair plan options', () => {
+  test('applies maxMalesMatches, maxFemalesMatches, maxCrossMatches caps', async () => {
+    const res = await request(buildApp()).put('/generatePairPlan').send({
+      nM: 8,
+      nF: 6,
+      maxMalesMatches: 16,
+      maxFemalesMatches: 5,
+      maxCrossMatches: 4
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.males_matches).toHaveLength(16);
+    expect(res.body.females_matches).toHaveLength(5);
+    expect(res.body.cross_matches).toHaveLength(4);
+  });
+
+  test('returns alternative plans array when alternativeCount > 1', async () => {
+    const res = await request(buildApp()).put('/generatePairPlan').send({
+      nM: 8,
+      nF: 6,
+      maxMalesMatches: 16,
+      reducedFemales: true,
+      randomize: true,
+      alternativeCount: 3,
+      seed: 'routes-alt'
+    });
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.plans)).toBe(true);
+    expect(res.body.plans.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test('returns grouped cross plans with female indices limited by crossFemaleAllocation', async () => {
+    const res = await request(buildApp()).put('/generatePairPlan').send({
+      nM: 6,
+      nF: 6,
+      crossFemaleAllocation: [3, 3],
+      maxCrossMatches: 6,
+    });
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.cross_matches_group1)).toBe(true);
+    expect(Array.isArray(res.body.cross_matches_group2)).toBe(true);
+    expect(res.body.cross_matches_group1.length).toBeGreaterThan(0);
+    expect(res.body.cross_matches_group2.length).toBeGreaterThan(0);
+
+    const extractFemaleIndex = (code) => {
+      const m = String(code).match(/^[AB]F(\d+)/);
+      return m ? parseInt(m[1], 10) : null;
+    };
+
+    for (const match of res.body.cross_matches_group1) {
+      const femaleIdx = [...match.team1, ...match.team2]
+        .map(extractFemaleIndex)
+        .filter(v => v !== null);
+      expect(femaleIdx.length).toBe(2);
+      for (const idx of femaleIdx) {
+        expect(idx).toBeLessThanOrEqual(3);
+      }
+    }
+
+    for (const match of res.body.cross_matches_group2) {
+      const femaleIdx = [...match.team1, ...match.team2]
+        .map(extractFemaleIndex)
+        .filter(v => v !== null);
+      expect(femaleIdx.length).toBe(2);
+      for (const idx of femaleIdx) {
+        // group2 uses the second half of the female pool: indices 4-6
+        expect(idx).toBeGreaterThanOrEqual(4);
+        expect(idx).toBeLessThanOrEqual(6);
+      }
+    }
   });
 });
 
@@ -419,8 +523,8 @@ describe('PUT /generateMatchesAndGroups — generate groups and matches', () => 
   beforeEach(() => {
     mockOpensStore.opens = [sampleOpens({
       categories: [
-        { id: 'huitailang', males: htMales, females: [] },
-        { id: 'xiyangyang', males: xyMales, females: [] },
+        { id: 'A', males: htMales, females: [] },
+        { id: 'B', males: xyMales, females: [] },
       ],
     })];
     // Simple pair plan: one males match pairing A1+A2 vs B1+B2
@@ -441,11 +545,25 @@ describe('PUT /generateMatchesAndGroups — generate groups and matches', () => 
     expect(res.status).toBe(404);
   });
 
-  test('generates males matches from the pair plan', async () => {
+  test('returns 400 when opens has more than 2 teams', async () => {
+    mockOpensStore.opens = [sampleOpens({
+      categories: [
+        { id: 'A', males: htMales, females: [] },
+        { id: 'B', males: xyMales, females: [] },
+        { id: 'C', males: htMales, females: [] },
+      ],
+    })];
+    const res = await request(buildApp()).put('/generateMatchesAndGroups').send({ opensId: 'TestOpens-2026-06-01' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/3 teams/);
+  });
+
+  test('generates males matches dynamically from player count', async () => {
+    // 6 males per side → C(6,2) = 15 male matches
     const res = await request(buildApp()).put('/generateMatchesAndGroups').send({ opensId: 'TestOpens-2026-06-01' });
     expect(res.status).toBe(200);
     const malesMatches = res.body.matches.filter(m => m.type === 'males');
-    expect(malesMatches.length).toBe(1);
+    expect(malesMatches.length).toBe(15);
   });
 
   test('resolves player codes to actual names in matches', async () => {
@@ -475,8 +593,13 @@ describe('PUT /generateMatchesAndGroups — generate groups and matches', () => 
     });
   });
 
-  test('produces no matches when pair plan is empty', async () => {
-    mockPairPlan = {};
+  test('produces no matches when opens has no players', async () => {
+    mockOpensStore.opens = [sampleOpens({
+      categories: [
+        { id: 'A', males: [], females: [] },
+        { id: 'B', males: [], females: [] },
+      ],
+    })];
     const res = await request(buildApp()).put('/generateMatchesAndGroups').send({ opensId: 'TestOpens-2026-06-01' });
     expect(res.status).toBe(200);
     expect(res.body.matches).toHaveLength(0);
@@ -486,5 +609,319 @@ describe('PUT /generateMatchesAndGroups — generate groups and matches', () => 
     await request(buildApp()).put('/generateMatchesAndGroups').send({ opensId: 'TestOpens-2026-06-01' });
     expect(mockOpensStore.opens[0].matches.length).toBeGreaterThan(0);
     expect(mockOpensStore.opens[0].groups).toBeDefined();
+  });
+
+  test('cross matches split one female group into halves for two male groups', async () => {
+    const htMales12 = Array.from({ length: 12 }, (_, i) => ({ id: `hm${i + 1}`, name: `HM${i + 1}` }));
+    const xyMales12 = Array.from({ length: 12 }, (_, i) => ({ id: `xm${i + 1}`, name: `XM${i + 1}` }));
+    const htFemales6 = Array.from({ length: 6 }, (_, i) => ({ id: `hf${i + 1}`, name: `HF${i + 1}` }));
+    const xyFemales6 = Array.from({ length: 6 }, (_, i) => ({ id: `xf${i + 1}`, name: `XF${i + 1}` }));
+
+    mockOpensStore.opens = [sampleOpens({
+      categories: [
+        { id: 'A', males: htMales12, females: htFemales6 },
+        { id: 'B', males: xyMales12, females: xyFemales6 },
+      ],
+    })];
+
+    const res = await request(buildApp()).put('/generateMatchesAndGroups').send({ opensId: 'TestOpens-2026-06-01' });
+    expect(res.status).toBe(200);
+
+    const crossMatches = res.body.matches.filter(m => m.type === 'cross');
+    expect(crossMatches.length).toBeGreaterThan(0);
+
+    const crossGroups = new Set(crossMatches.map(m => m.group));
+    expect(crossGroups).toEqual(new Set([1, 2]));
+
+    const group1Females = new Set(
+      crossMatches
+        .filter(m => m.group === 1)
+        .flatMap(m => [...m.team1, ...m.team2])
+        .filter(name => /^HF\d+$/.test(name) || /^XF\d+$/.test(name))
+    );
+    const group2Females = new Set(
+      crossMatches
+        .filter(m => m.group === 2)
+        .flatMap(m => [...m.team1, ...m.team2])
+        .filter(name => /^HF\d+$/.test(name) || /^XF\d+$/.test(name))
+    );
+
+    for (const name of group1Females) {
+      const idx = parseInt(name.slice(2), 10);
+      expect(idx).toBeGreaterThanOrEqual(1);
+      expect(idx).toBeLessThanOrEqual(3);
+    }
+    for (const name of group2Females) {
+      const idx = parseInt(name.slice(2), 10);
+      expect(idx).toBeGreaterThanOrEqual(4);
+      expect(idx).toBeLessThanOrEqual(6);
+    }
+  });
+
+  test('caps male matches at 16 by default for 8-player male groups', async () => {
+    const htMales8 = Array.from({ length: 8 }, (_, i) => ({ id: `hm${i + 1}`, name: `HM${i + 1}` }));
+    const xyMales8 = Array.from({ length: 8 }, (_, i) => ({ id: `xm${i + 1}`, name: `XM${i + 1}` }));
+
+    mockOpensStore.opens = [sampleOpens({
+      categories: [
+        { id: 'A', males: htMales8, females: [] },
+        { id: 'B', males: xyMales8, females: [] },
+      ],
+    })];
+
+    const res = await request(buildApp()).put('/generateMatchesAndGroups').send({ opensId: 'TestOpens-2026-06-01' });
+    expect(res.status).toBe(200);
+
+    const malesMatches = res.body.matches.filter(m => m.type === 'males');
+    expect(malesMatches).toHaveLength(16);
+  });
+
+  test('uses customPairPlan when provided to generate matches', async () => {
+    const htFemales = Array.from({ length: 6 }, (_, i) => ({ id: `hf${i + 1}`, name: `HF${i + 1}` }));
+    const xyFemales = Array.from({ length: 6 }, (_, i) => ({ id: `xf${i + 1}`, name: `XF${i + 1}` }));
+
+    mockOpensStore.opens = [sampleOpens({
+      categories: [
+        { id: 'A', males: htMales, females: htFemales },
+        { id: 'B', males: xyMales, females: xyFemales },
+      ],
+    })];
+
+    const customPairPlan = {
+      males_matches: [{ team1: ['A1', 'A2'], team2: ['B1', 'B2'] }],
+      females_matches: [{ team1: ['A1', 'A2'], team2: ['B1', 'B2'] }],
+      cross_matches: [{ team1: ['AM1', 'AF1'], team2: ['BM1', 'BF1'] }]
+    };
+
+    const res = await request(buildApp()).put('/generateMatchesAndGroups').send({
+      opensId: 'TestOpens-2026-06-01',
+      customPairPlan
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.matches.filter(m => m.type === 'males')).toHaveLength(1);
+    expect(res.body.matches.filter(m => m.type === 'females')).toHaveLength(1);
+    expect(res.body.matches.filter(m => m.type === 'cross')).toHaveLength(1);
+  });
+
+  test('returns warning when roster cannot be evenly split into groups', async () => {
+    const htMales7 = Array.from({ length: 7 }, (_, i) => ({ id: `hm${i + 1}`, name: `HM${i + 1}` }));
+    const xyMales7 = Array.from({ length: 7 }, (_, i) => ({ id: `xm${i + 1}`, name: `XM${i + 1}` }));
+
+    mockOpensStore.opens = [sampleOpens({
+      categories: [
+        { id: 'A', males: htMales7, females: [] },
+        { id: 'B', males: xyMales7, females: [] },
+      ],
+    })];
+
+    const res = await request(buildApp()).put('/generateMatchesAndGroups').send({ opensId: 'TestOpens-2026-06-01' });
+    expect(res.status).toBe(200);
+    expect(typeof res.body.warning).toBe('string');
+    expect(res.body.warning).toContain('男子人数无法按每组');
+  });
+
+  test('single female group is split across multiple male groups for cross matches', async () => {
+    const htMales18 = Array.from({ length: 18 }, (_, i) => ({ id: `hm${i + 1}`, name: `HM${i + 1}` }));
+    const xyMales18 = Array.from({ length: 18 }, (_, i) => ({ id: `xm${i + 1}`, name: `XM${i + 1}` }));
+    const htFemales6 = Array.from({ length: 6 }, (_, i) => ({ id: `hf${i + 1}`, name: `HF${i + 1}` }));
+    const xyFemales6 = Array.from({ length: 6 }, (_, i) => ({ id: `xf${i + 1}`, name: `XF${i + 1}` }));
+
+    mockOpensStore.opens = [sampleOpens({
+      categories: [
+        { id: 'A', males: htMales18, females: htFemales6 },
+        { id: 'B', males: xyMales18, females: xyFemales6 },
+      ],
+    })];
+
+    const res = await request(buildApp()).put('/generateMatchesAndGroups').send({ opensId: 'TestOpens-2026-06-01' });
+    expect(res.status).toBe(200);
+
+    const crossMatches = res.body.matches.filter(m => m.type === 'cross');
+    expect(crossMatches.length).toBeGreaterThan(0);
+    const groups = new Set(crossMatches.map(m => m.group));
+    expect(groups).toEqual(new Set([1, 2, 3]));
+
+    expect(res.body.crossSplit).toBeDefined();
+    expect(res.body.crossSplit.pairedFemaleCount).toBe(6);
+    expect(res.body.crossSplit.maleGroupSizes).toEqual([6, 6, 6]);
+    expect(res.body.crossSplit.femaleAllocationByCrossGroup).toEqual([2, 2, 2]);
+
+    const femaleNames = new Set(
+      crossMatches.flatMap(m => [...m.team1, ...m.team2]).filter(n => /^HF\d+$/.test(n) || /^XF\d+$/.test(n))
+    );
+    expect(femaleNames.size).toBeGreaterThanOrEqual(6);
+    expect(femaleNames.has('HF1')).toBe(true);
+    expect(femaleNames.has('HF6')).toBe(true);
+  });
+
+  test('custom cross plan with AF4G1 notation resolves against original female group indices', async () => {
+    const htMales12 = Array.from({ length: 12 }, (_, i) => ({ id: `hm${i + 1}`, name: `HM${i + 1}` }));
+    const xyMales12 = Array.from({ length: 12 }, (_, i) => ({ id: `xm${i + 1}`, name: `XM${i + 1}` }));
+    const htFemales6 = Array.from({ length: 6 }, (_, i) => ({ id: `hf${i + 1}`, name: `HF${i + 1}` }));
+    const xyFemales6 = Array.from({ length: 6 }, (_, i) => ({ id: `xf${i + 1}`, name: `XF${i + 1}` }));
+
+    mockOpensStore.opens = [sampleOpens({
+      categories: [
+        { id: 'A', males: htMales12, females: htFemales6 },
+        { id: 'B', males: xyMales12, females: xyFemales6 },
+      ],
+    })];
+
+    const customPairPlan = {
+      males_matches: [],
+      females_matches: [],
+      cross_matches_group1: [{ team1: ['AM1', 'AF1G1'], team2: ['BM1', 'BF1G1'] }],
+      cross_matches_group2: [{ team1: ['AM1', 'AF4G1'], team2: ['BM1', 'BF4G1'] }]
+    };
+
+    const res = await request(buildApp()).put('/generateMatchesAndGroups').send({
+      opensId: 'TestOpens-2026-06-01',
+      customPairPlan
+    });
+    expect(res.status).toBe(200);
+
+    const crossG1 = res.body.matches.find(m => m.type === 'cross' && m.group === 1);
+    const crossG2 = res.body.matches.find(m => m.type === 'cross' && m.group === 2);
+    expect(crossG1).toBeDefined();
+    expect(crossG2).toBeDefined();
+    expect([...crossG1.team1, ...crossG1.team2]).toContain('HF1');
+    expect([...crossG2.team1, ...crossG2.team2]).toContain('HF4');
+  });
+
+  test('rejects custom male plan that needs more players than actual male group size', async () => {
+    mockOpensStore.opens = [sampleOpens({
+      categories: [
+        { id: 'A', males: htMales, females: [] },
+        { id: 'B', males: xyMales, females: [] },
+      ],
+    })];
+
+    const customPairPlan = {
+      males_matches: [{ team1: ['A7', 'A8'], team2: ['B7', 'B8'] }],
+      females_matches: [],
+      cross_matches: []
+    };
+
+    const res = await request(buildApp()).put('/generateMatchesAndGroups').send({
+      opensId: 'TestOpens-2026-06-01',
+      customPairPlan
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('男子配对方案需要至少8名选手');
+  });
+});
+
+// ─── PUT /registration/add ───────────────────────────────────────────────────
+describe('PUT /registration/add — add a registration entry', () => {
+  beforeEach(() => {
+    mockOpensStore.opens = [sampleOpens()];
+  });
+
+  test('rejects a ladder registration entry (fromLadder: true is not allowed via this endpoint)', async () => {
+    const res = await request(buildApp()).put('/registration/add').send({
+      opensId: 'TestOpens-2026-06-01',
+      name: 'Scott Ding',
+      gender: 'males',
+      fromLadder: true,
+      playerId: 'player-001',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('adds an external registration entry without playerId', async () => {
+    const res = await request(buildApp()).put('/registration/add').send({
+      opensId: 'TestOpens-2026-06-01',
+      name: 'Jane Doe',
+      gender: 'females',
+      fromLadder: false,
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.registration[0].fromLadder).toBe(false);
+    expect(res.body.registration[0].playerId).toBeUndefined();
+  });
+
+  test('persists the entry to the store', async () => {
+    await request(buildApp()).put('/registration/add').send({
+      opensId: 'TestOpens-2026-06-01',
+      name: 'Alice',
+      gender: 'females',
+      fromLadder: false,
+    });
+    expect(mockOpensStore.opens[0].registration).toHaveLength(1);
+    expect(mockOpensStore.opens[0].registration[0].name).toBe('Alice');
+  });
+
+  test('generates a unique id for each entry', async () => {
+    const app = buildApp();
+    await request(app).put('/registration/add').send({ opensId: 'TestOpens-2026-06-01', name: 'A', gender: 'males', fromLadder: false });
+    await request(app).put('/registration/add').send({ opensId: 'TestOpens-2026-06-01', name: 'B', gender: 'females', fromLadder: false });
+    const ids = mockOpensStore.opens[0].registration.map(e => e.id);
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  test('returns 400 when required fields are missing', async () => {
+    const res = await request(buildApp()).put('/registration/add').send({ opensId: 'TestOpens-2026-06-01', gender: 'males' });
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 400 for invalid gender', async () => {
+    const res = await request(buildApp()).put('/registration/add').send({
+      opensId: 'TestOpens-2026-06-01', name: 'Alice', gender: 'robots', fromLadder: false,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 404 when opens is not found', async () => {
+    const res = await request(buildApp()).put('/registration/add').send({
+      opensId: 'no-such-id', name: 'Alice', gender: 'males', fromLadder: false,
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
+// ─── PUT /registration/delete ────────────────────────────────────────────────
+describe('PUT /registration/delete — delete a registration entry', () => {
+  beforeEach(() => {
+    mockOpensStore.opens = [sampleOpens({
+      registration: [
+        { id: 'reg-001', name: 'Scott Ding', gender: 'males', fromLadder: true, playerId: 'player-001' },
+        { id: 'reg-002', name: 'Jane Doe', gender: 'females', fromLadder: false },
+      ],
+    })];
+  });
+
+  test('removes the entry and returns the updated opens', async () => {
+    const res = await request(buildApp()).put('/registration/delete').send({
+      opensId: 'TestOpens-2026-06-01', entryId: 'reg-001',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.registration).toHaveLength(1);
+    expect(res.body.registration[0].id).toBe('reg-002');
+  });
+
+  test('persists the deletion to the store', async () => {
+    await request(buildApp()).put('/registration/delete').send({
+      opensId: 'TestOpens-2026-06-01', entryId: 'reg-001',
+    });
+    expect(mockOpensStore.opens[0].registration).toHaveLength(1);
+  });
+
+  test('returns 404 when entry is not found', async () => {
+    const res = await request(buildApp()).put('/registration/delete').send({
+      opensId: 'TestOpens-2026-06-01', entryId: 'no-such-entry',
+    });
+    expect(res.status).toBe(404);
+  });
+
+  test('returns 400 when required fields are missing', async () => {
+    const res = await request(buildApp()).put('/registration/delete').send({ opensId: 'TestOpens-2026-06-01' });
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 404 when opens is not found', async () => {
+    const res = await request(buildApp()).put('/registration/delete').send({
+      opensId: 'no-such-id', entryId: 'reg-001',
+    });
+    expect(res.status).toBe(404);
   });
 });

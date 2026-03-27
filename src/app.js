@@ -16,96 +16,17 @@ let dataOpens;
 // Initialize website
 async function init() {
   await syncDataFromServer();
-  showPage('home');
-}
 
-// HTTP POST request
-function addDataToServer(path, payload) {
-  const url = `${SERVER_BASE}${path}`;
-  return fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  }).then(res => {
-    if (!res.ok) throw new Error(`Server responded ${res.status}`);
-    return res.json().catch(() => ({}));
-  }).catch(err => {
-    console.warn('sendToServer error:', err);
-  });
-}
+  const params = new URLSearchParams(window.location.search);
+  const opensId = params.get('opensId');
+  const tab = params.get('tab');
 
-//HTTP PUT request
-function updateDataToServer(path, payload) {
-  const url = `${SERVER_BASE}${path}`;
-  return fetch(url, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  }).then(res => {
-    if (!res.ok) throw new Error(`Server responded ${res.status}`);
-    return res.json().catch(() => ({}));
-  }).catch(err => {
-    console.warn('updateDataToServer error:', err);
-  });
-}
-
-//HTTP GET request
-function getFromServer(path) {
-  const url = `${SERVER_BASE}${path}`;
-  return fetch(url, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' }
-  }).then(res => {
-    if (!res.ok) throw new Error(`Server responded ${res.status}`);
-    return res.json();
-  }).catch(err => {
-    console.warn('getFromServer error:', err);
-  });
-}
-
-//HTTP DELETE request
-function deleteFromServer(path, payload) {
-  // send DELETE to server and return the fetch promise so caller can await it
-  try {
-    return fetch(`${SERVER_BASE}${path}`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload ? JSON.stringify(payload) : undefined
-    }).then(res =>{
-    if (!res.ok) throw new Error(`Server responded ${res.status}`);
-    return res.json();
-    }).catch(err => {
-      console.warn('Failed to notify server of deletion:', err);
-      return null;
-    });
-  } catch (e) {
-    console.warn('Error sending delete to server:', e);
-    return Promise.resolve(null);
-  }
-}
-
-// Handle admin authentication for sensitive operations
-async function sendAuthenticatedRequest(endpoint, payload) {
-  // Use cached credentials if already verified this session
-  let credentials = _cachedAdminCredentials;
-  if (!credentials) {
-    credentials = await promptForAdminCredentials();
-    if (!credentials) return;
-  }
-
-  const adminResponse = await addDataToServer('/api/admin/', { adminName: credentials.name, adminPassword: credentials.password });
-  if (adminResponse && adminResponse.authenticated) {
-    _cachedAdminCredentials = credentials; // cache on first successful verify
-    return updateDataToServer(endpoint, payload);
+  if (opensId) {
+    showPage('opens');
+    await deepLinkToOpens(opensId, tab || 'registration');
   } else {
-    _cachedAdminCredentials = null; // clear cache so user can re-enter
-    alert('管理员验证失败，请检查用户名和密码！');
+    showPage('home');
   }
-}
-
-async function syncDataFromServer() {
-  data = await getFromServer('/api/main');
-  dataOpens = await getFromServer('/api/opens');
 }
 
 // Navigation and rendering pages

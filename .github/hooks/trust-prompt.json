@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "windows": "powershell -NoProfile -ExecutionPolicy Bypass -File .github/hooks/scripts/trust-prompt.ps1",
+        "command": "bash .github/hooks/scripts/trust-prompt.sh",
+        "timeout": 30
+      }
+    ]
+  }
+}
