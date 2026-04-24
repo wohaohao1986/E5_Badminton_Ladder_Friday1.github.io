@@ -70,6 +70,26 @@ describe('safeWriteJson', () => {
     safeWriteJson(tmpFile, data);
     expect(JSON.parse(fs.readFileSync(tmpFile, 'utf8'))).toEqual(data);
   });
+
+  test('writes opens_pair_plan.json in middle-ground format', () => {
+    const planFile = path.join(os.tmpdir(), 'opens_pair_plan.json');
+    const data = {
+      males_matches: [
+        { team1: ['A1', 'A2'], team2: ['B1', 'B2'] }
+      ],
+      females_matches: [],
+      cross_matches: []
+    };
+
+    try {
+      safeWriteJson(planFile, data);
+      const raw = fs.readFileSync(planFile, 'utf8');
+      expect(raw).toContain('{ "team1": ["A1","A2"], "team2": ["B1","B2"] }');
+      expect(JSON.parse(raw)).toEqual(data);
+    } finally {
+      if (fs.existsSync(planFile)) fs.unlinkSync(planFile);
+    }
+  });
 });
 
 // ─── logToFile ────────────────────────────────────────────────────────────────
