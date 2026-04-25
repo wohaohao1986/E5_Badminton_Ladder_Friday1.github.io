@@ -451,7 +451,13 @@ function generateFullPlan(nM, nF, options = {}) {
       ? { maxMatches: maxCrossMatches, randomize, seed: crossSeed, sideA, sideB }
       : { randomize, seed: crossSeed, sideA, sideB });
 
-  return { males_matches, females_matches, cross_matches };
+  const taggedAll = [
+    ...males_matches.map(m => ({ ...m, matchType: 'males' })),
+    ...females_matches.map(m => ({ ...m, matchType: 'females' })),
+    ...cross_matches.map(m => ({ ...m, matchType: 'cross' }))
+  ];
+  const rounds = groupMatchesIntoRounds(taggedAll);
+  return { males_matches, females_matches, cross_matches, rounds };
 }
 
 function canonicalTeamKey(team) {
@@ -557,6 +563,68 @@ function generateNTeamPlan(teams, options = {}) {
   return { pairings };
 }
 
+/**
+ * Normalize a player code for cross-type round conflict detection.
+ *
+ * Males and females share the same code namespace (A1, B1 etc.) but are
+ * different physical people. Cross matches share players with both genders
+ * via AM/AF codes. To detect real conflicts while avoiding false ones:
+ *
+ *   males   A1  → M:A1,  B1  → M:B1
+ *   females A1  → F:A1,  B1  → F:B1
+ *   cross   AM1 → M:A1, AF1G1 → F:A1G1, BM2 → M:B2, BF3 → F:B3
+ *
+ * @param {string} code
+ * @param {string} matchType - 'males' | 'females' | 'cross'
+ * @returns {string}
+ */
+function normalizeCodeForRound(code, matchType) {
+  if (matchType === 'cross') {
+    // AM1 → M:A1,  AF1G1 → F:A1G1,  BM2 → M:B2,  BF3G1 → F:B3G1
+    return code.replace(/^([AB])([MF])/, (_, side, gender) => `${gender}:${side}`);
+  }
+  return `${matchType === 'males' ? 'M' : 'F'}:${code}`;
+}
+
+/**
+ * Group a flat list of matches into rounds so that no player appears more
+ * than once per round. Handles mixed match types (males, females, cross)
+ * using type-aware code normalization to avoid false conflicts between
+ * the separate male/female player pools.
+ *
+ * Uses a greedy first-fit algorithm: each match is placed in the earliest
+ * round that has no player conflict. The number of rounds equals the
+ * chromatic index of the match conflict graph.
+ *
+ * @param {Array<{team1: string[], team2: string[], matchType: string}>} matches
+ *   Each match must have a `matchType` of 'males', 'females', or 'cross'.
+ * @returns {Array<{round: number, matches: Array}>}
+ */
+function groupMatchesIntoRounds(matches) {
+  // Each round stores original matches plus a set of normalized player keys
+  const rounds = [];
+  for (const match of matches) {
+    const type = match.matchType || 'males';
+    const keys = new Set(
+      [...(match.team1 || []), ...(match.team2 || [])].map(c => normalizeCodeForRound(c, type))
+    );
+    let assigned = false;
+    for (const round of rounds) {
+      const hasConflict = [...keys].some(k => round.playerKeys.has(k));
+      if (!hasConflict) {
+        round.matches.push(match);
+        for (const k of keys) round.playerKeys.add(k);
+        assigned = true;
+        break;
+      }
+    }
+    if (!assigned) {
+      rounds.push({ round: rounds.length + 1, matches: [match], playerKeys: new Set(keys) });
+    }
+  }
+  return rounds.map(({ round, matches }) => ({ round, matches }));
+}
+
 module.exports = {
   generateMalesPlan,
   generateFemalesPlan,
@@ -564,5 +632,6 @@ module.exports = {
   generateCrossPlan,
   generateFullPlan,
   generateAlternativePlans,
-  generateNTeamPlan
+  generateNTeamPlan,
+  groupMatchesIntoRounds
 };

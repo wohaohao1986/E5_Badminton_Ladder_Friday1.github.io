@@ -153,7 +153,14 @@ This enforces the appearance cap symmetrically on both A and B sides, preventing
 
 ### 4.4 `generateCrossPlan(nM, nF, options)`
 
-Cross matches pair one male + one female from each side.
+Cross matches pair one male + one female from the **same side (team)**.
+
+Each team in an Opens tournament is already a cross-tier mix by construction:
+- Males come from the `huitailang` (advanced) ladder category
+- Females come from the `xiyangyang` (intermediate) ladder category
+- Import logic distributes both evenly across Team A and Team B (round-robin)
+
+So `[AM_i, AF_j]` is already "advanced male + intermediate female from Team A" — no additional tier-crossing is needed.
 
 ```
 Input:  nM, nF, options.maxMatches (default max(nM,nF), max nM×nF)
@@ -216,8 +223,7 @@ generateAlternativePlans(8, 6, {
 
 Returns an array of unique full plans (`males_matches`, `females_matches`, `cross_matches`).
 
-UI wording note: `reducedFemales` is shown in the frontend as “限制女子出场次数”, and `femalesMaxAppearances` is shown as “女子最多出场次数”.
-### 4.7 `generateNTeamPlan(teams, options)` — N-team round-robin
+UI wording note: `reducedFemales` is shown in the frontend as “限制女子出场次数”, and `femalesMaxAppearances` is shown as “女子最多出场次数”.### 4.7 `generateNTeamPlan(teams, options)` — N-team round-robin
 
 Generates a round-robin schedule for **N ≥ 2 teams**. Produces C(N,2) sub-plans — one per unique team pair.
 
@@ -247,6 +253,42 @@ generateNTeamPlan([
 **Unequal team sizes:** when two paired teams have different `nM` or `nF`, `Math.min` is used for each dimension. The sub-plan covers the top-ranked players of the larger team.
 
 **Seeding:** if `options.seed` is set, each pair gets a derived seed `<seed>:<team1Id>v<team2Id>` for reproducible, independent randomisation.
+
+### 4.8 `groupMatchesIntoRounds(matches)` — Court scheduling
+
+Groups a flat list of tagged matches into rounds so that **no player appears more than once per round**. Matches within a round can be played simultaneously on separate courts.
+
+```
+Input:  matches — array of match objects, each with a `matchType` field ('males'|'females'|'cross')
+Output: [{ round: 1, matches: [...] }, { round: 2, matches: [...] }, ...]
+
+Algorithm: greedy first-fit
+  For each match:
+    normalise each player code to a type-aware key (see below)
+    find the earliest round with no player key conflict
+    place the match there (or open a new round)
+```
+
+**Type-aware code normalization** avoids false conflicts between the male and female player pools (which reuse the same `A1`/`B1` namespace):
+
+| Input code | Match type | Normalized key |
+|---|---|---|
+| `A1` | males | `M:A1` |
+| `A1` | females | `F:A1` |
+| `AM1` | cross | `M:A1` |
+| `AF1G1` | cross | `F:A1G1` |
+| `BM2` | cross | `M:B2` |
+| `BF3` | cross | `F:B3` |
+
+This means:
+- `AM1` (cross) correctly conflicts with `A1` (males) — same physical person
+- `AF1` (cross) correctly conflicts with `A1` (females) — same physical person  
+- `A1` (males) does **not** conflict with `A1` (females) — different people
+
+`generateFullPlan` always calls this internally and includes `rounds` in its output.
+
+**Minimum rounds:** For `n` players per side, `n−1` rounds are a theoretical lower bound (Vizing's theorem for the K_n complete graph). The greedy first-fit algorithm does not guarantee this optimum — it uses a simple round-assignment heuristic that is correct (no conflicts) but not globally optimal. For typical tournament sizes (n ≤ 8), the resulting schedule is practically useful regardless.
+
 ---
 
 ## 5. API Endpoint: `PUT /api/opens/generatePairPlan`
@@ -332,7 +374,16 @@ generateFullPlan(nM, nF, {
   // Females appearance-cap mode (alternative to maxFemalesMatches):
   reducedFemales:         boolean,  // default: false; UI label: “限制女子出场次数”
   femalesMaxAppearances:  number,   // default: 3 (only used when reducedFemales=true)
+
 })
+
+// Return value always includes `rounds`:
+// {
+//   males_matches:   [...],
+//   females_matches: [...],
+//   cross_matches:   [...],
+//   rounds: [{ round: 1, matches: [{ ...match, matchType: 'males'|'females'|'cross' }] }, ...]
+// }
 ```
 
 `reducedFemales` and `maxFemalesMatches` serve different purposes:

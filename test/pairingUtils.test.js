@@ -7,7 +7,8 @@ const {
   generateCrossPlan,
   generateFullPlan,
   generateAlternativePlans,
-  generateNTeamPlan
+  generateNTeamPlan,
+  groupMatchesIntoRounds
 } = require('../src/utils/pairingUtils');
 
 // ---------------------------------------------------------------------------
@@ -639,5 +640,145 @@ describe('generateNTeamPlan', () => {
       expect(Array.isArray(p.females_matches)).toBe(true);
       expect(Array.isArray(p.cross_matches)).toBe(true);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// groupMatchesIntoRounds
+// ---------------------------------------------------------------------------
+
+describe('groupMatchesIntoRounds', () => {
+  test('returns empty array for empty input', () => {
+    expect(groupMatchesIntoRounds([])).toEqual([]);
+  });
+
+  test('single match produces one round with that match', () => {
+    const matches = [{ team1: ['A1', 'A2'], team2: ['B1', 'B2'], matchType: 'males' }];
+    const rounds = groupMatchesIntoRounds(matches);
+    expect(rounds).toHaveLength(1);
+    expect(rounds[0].round).toBe(1);
+    expect(rounds[0].matches).toHaveLength(1);
+  });
+
+  test('all matches are covered across rounds', () => {
+    const plan = generateFullPlan(6, 6);
+    const all = [
+      ...plan.males_matches.map(m => ({ ...m, matchType: 'males' })),
+      ...plan.females_matches.map(m => ({ ...m, matchType: 'females' })),
+      ...plan.cross_matches.map(m => ({ ...m, matchType: 'cross' }))
+    ];
+    const rounds = groupMatchesIntoRounds(all);
+    const total = rounds.reduce((s, r) => s + r.matches.length, 0);
+    expect(total).toBe(all.length);
+  });
+
+  test('no player appears twice in the same round (males only)', () => {
+    const plan = generateMalesPlan(6);
+    const tagged = plan.map(m => ({ ...m, matchType: 'males' }));
+    const rounds = groupMatchesIntoRounds(tagged);
+    for (const round of rounds) {
+      const seen = new Set();
+      for (const m of round.matches) {
+        for (const p of [...m.team1, ...m.team2]) {
+          expect(seen.has(p)).toBe(false);
+          seen.add(p);
+        }
+      }
+    }
+  });
+
+  test('no player appears twice in the same round (mixed types)', () => {
+    const plan = generateFullPlan(6, 6);
+    const all = [
+      ...plan.males_matches.map(m => ({ ...m, matchType: 'males' })),
+      ...plan.females_matches.map(m => ({ ...m, matchType: 'females' })),
+      ...plan.cross_matches.map(m => ({ ...m, matchType: 'cross' }))
+    ];
+    const rounds = groupMatchesIntoRounds(all);
+    for (const round of rounds) {
+      // Use the same normalization as the function: check by normalized keys
+      const seen = new Set();
+      for (const m of round.matches) {
+        const type = m.matchType || 'males';
+        for (const code of [...(m.team1 || []), ...(m.team2 || [])]) {
+          // Derive normalized key manually: same logic as normalizeCodeForRound
+          let key;
+          if (type === 'cross') {
+            key = code.replace(/^([AB])([MF])/, (_, side, gender) => `${gender}:${side}`);
+          } else {
+            key = `${type === 'males' ? 'M' : 'F'}:${code}`;
+          }
+          expect(seen.has(key)).toBe(false);
+          seen.add(key);
+        }
+      }
+    }
+  });
+
+  test('cross match AM1 conflicts with A1 in males (same physical player)', () => {
+    const matches = [
+      { team1: ['A1', 'A2'], team2: ['B1', 'B2'], matchType: 'males' },
+      { team1: ['AM1', 'AF1'], team2: ['BM3', 'BF2'], matchType: 'cross' }
+    ];
+    const rounds = groupMatchesIntoRounds(matches);
+    // AM1 = M:A1 conflicts with males A1 = M:A1 → must be in different rounds
+    expect(rounds).toHaveLength(2);
+  });
+
+  test('A1 in males does NOT conflict with A1 in females (different players)', () => {
+    const matches = [
+      { team1: ['A1', 'A2'], team2: ['B1', 'B2'], matchType: 'males' },
+      { team1: ['A1', 'A2'], team2: ['B1', 'B2'], matchType: 'females' }
+    ];
+    const rounds = groupMatchesIntoRounds(matches);
+    // No real conflict — both fit in round 1
+    expect(rounds).toHaveLength(1);
+    expect(rounds[0].matches).toHaveLength(2);
+  });
+
+  test('round numbers are sequential starting at 1', () => {
+    const tagged = generateMalesPlan(6).map(m => ({ ...m, matchType: 'males' }));
+    const rounds = groupMatchesIntoRounds(tagged);
+    rounds.forEach((r, i) => expect(r.round).toBe(i + 1));
+  });
+
+  test('round count is bounded: at least 1 and at most total matches', () => {
+    const tagged = generateMalesPlan(6).map(m => ({ ...m, matchType: 'males' }));
+    const rounds = groupMatchesIntoRounds(tagged);
+    // At least 1 round; at most one round per match; practically much fewer
+    expect(rounds.length).toBeGreaterThanOrEqual(1);
+    expect(rounds.length).toBeLessThanOrEqual(tagged.length);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateFullPlan — rounds field
+// ---------------------------------------------------------------------------
+
+describe('generateFullPlan — rounds field', () => {
+  test('always returns a rounds array', () => {
+    const plan = generateFullPlan(6, 6);
+    expect(plan).toHaveProperty('rounds');
+    expect(Array.isArray(plan.rounds)).toBe(true);
+    expect(plan.rounds.length).toBeGreaterThan(0);
+  });
+
+  test('rounds cover all matches', () => {
+    const plan = generateFullPlan(6, 6);
+    const total = plan.rounds.reduce((s, r) => s + r.matches.length, 0);
+    expect(total).toBe(plan.males_matches.length + plan.females_matches.length + plan.cross_matches.length);
+  });
+
+  test('each match in rounds has a matchType field', () => {
+    for (const r of generateFullPlan(6, 6).rounds) {
+      for (const m of r.matches) {
+        expect(['males', 'females', 'cross']).toContain(m.matchType);
+      }
+    }
+  });
+
+  test('rounds exist with reducedFemales option', () => {
+    const plan = generateFullPlan(6, 6, { reducedFemales: true });
+    expect(plan.rounds.length).toBeGreaterThan(0);
   });
 });
