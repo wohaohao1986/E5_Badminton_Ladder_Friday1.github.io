@@ -520,7 +520,30 @@ router.put('/generateMatchesAndGroups', (req, res) => {
   }
 });
 
-// PUT: Update an existing opens (e.g. save match scores)
+// PUT: Record a score for a specific match (targeted update — avoids concurrent overwrites)
+router.put('/:id/score', (req, res) => {
+  const opensId = req.params.id;
+  const { matchIndex, score1, score2 } = req.body;
+  if (matchIndex == null || score1 == null || score2 == null)
+    return res.status(400).json({ error: 'matchIndex, score1, score2 required' });
+  const mIdx = parseInt(matchIndex);
+  if (isNaN(mIdx) || mIdx < 0) return res.status(400).json({ error: 'Invalid matchIndex' });
+  if (typeof score1 !== 'number' || typeof score2 !== 'number')
+    return res.status(400).json({ error: 'score1 and score2 must be numbers' });
+  if (score1 < 0 || score2 < 0) return res.status(400).json({ error: 'Scores must be non-negative' });
+  const store = loadStore();
+  const opens = (store.opens || []).find(o => o.id === opensId);
+  if (!opens) return res.status(404).json({ error: 'Opens not found' });
+  if (!opens.matches || !opens.matches[mIdx]) return res.status(400).json({ error: 'Match not found' });
+  opens.matches[mIdx].score1 = score1;
+  opens.matches[mIdx].score2 = score2;
+  opens.matches[mIdx].completed = true;
+  saveStore(store);
+  logToFile(`Opens ${opensId} match ${mIdx} score recorded: ${score1}:${score2}`);
+  res.json(opens);
+});
+
+// PUT: Update an existing opens (full object replacement — used for bulk edits)
 router.put('/:id', (req, res) => {
   const opensId = req.params.id;
   const payload = req.body;

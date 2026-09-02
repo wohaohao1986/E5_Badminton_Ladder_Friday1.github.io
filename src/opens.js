@@ -690,8 +690,9 @@ function loadOpenPlayersData(opens) {
 
   // Rebuild team columns dynamically (supports N teams after import)
   if (teamsContainer) {
+    const teamName = { A: '野茫茫', B: '天苍苍' };
     const colHtml = opens.categories.map(cat =>
-      `<div style="flex:1;min-width:200px;"><h3 style="margin-top:0;">Team ${cat.id}</h3><div id="players-${cat.id}"></div></div>`
+      `<div style="flex:1;min-width:200px;"><h3 style="margin-top:0;">Team ${teamName[cat.id] || cat.id}</h3><div id="players-${cat.id}"></div></div>`
     ).join('');
     teamsContainer.innerHTML = `<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">${colHtml}</div>`;
   }
@@ -807,10 +808,70 @@ async function deleteOpensPlayer(categoryId, gender, playerId) {
   }
 }
 
+// Build a real-time scoreboard for 2-team opens showing wins per type and total.
+// Returns an HTML string, or '' when not applicable.
+function renderOpensScoreboard(opens) {
+  if (!opens.matches || opens.matches.length === 0) return '';
+  // Only meaningful for 2-team (Team A vs Team B) opens
+  if ((opens.categories || []).length !== 2) return '';
+
+  const types = ['males', 'females', 'cross'];
+  const typeLabel = { males: '男子', females: '女子', cross: '混合' };
+
+  const tally = {};
+  types.forEach(t => { tally[t] = { a: 0, b: 0 }; });
+  let totalA = 0, totalB = 0;
+
+  opens.matches.forEach(m => {
+    const t = m.type in tally ? m.type : null;
+    if (!t || !m.completed) return;
+    if (m.score1 > m.score2) {
+      tally[t].a++; totalA++;
+    } else if (m.score2 > m.score1) {
+      tally[t].b++; totalB++;
+    }
+    // draws count as neither
+  });
+
+  const activeTypes = types.filter(t => tally[t].a + tally[t].b > 0 ||
+    opens.matches.some(m => m.type === t));
+  if (activeTypes.length === 0) return '';
+
+  // Colour: winner green, loser dimmed, tied neutral
+  const col = (wins, other) => wins > other ? '#2e7d32' : wins < other ? '#aaa' : '#555';
+
+  let h = `<div style="margin-bottom:18px;padding:12px 14px;background:linear-gradient(135deg,#e8f5e9,#f1f8e9);border-radius:10px;border:1px solid #c8e6c9;">`;
+  h += `<div style="font-weight:bold;font-size:14px;color:#2e7d32;margin-bottom:10px;">&#128202; 实时战绩</div>`;
+  h += `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:260px;">`;
+  h += `<thead><tr style="border-bottom:2px solid #a5d6a7;">
+    <th style="text-align:left;padding:5px 8px;color:#777;font-weight:normal;">项目</th>
+    <th style="text-align:center;padding:5px 8px;color:#1565c0;font-weight:bold;">Team 野茫茫 胜</th>
+    <th style="text-align:center;padding:5px 8px;color:#b71c1c;font-weight:bold;">Team 天苍苍 胜</th>
+  </tr></thead><tbody>`;
+
+  activeTypes.forEach(t => {
+    const { a, b } = tally[t];
+    h += `<tr style="border-bottom:1px solid #e8f5e9;">
+      <td style="padding:6px 8px;color:#555;">${typeLabel[t]}</td>
+      <td style="text-align:center;padding:6px 8px;font-weight:bold;font-size:15px;color:${col(a, b)}">${a}</td>
+      <td style="text-align:center;padding:6px 8px;font-weight:bold;font-size:15px;color:${col(b, a)}">${b}</td>
+    </tr>`;
+  });
+
+  h += `<tr style="border-top:2px solid #a5d6a7;background:rgba(255,255,255,0.5);">
+    <td style="padding:7px 8px;font-weight:bold;color:#333;">总计</td>
+    <td style="text-align:center;padding:7px 8px;font-weight:bold;font-size:16px;color:${col(totalA, totalB)}">${totalA}</td>
+    <td style="text-align:center;padding:7px 8px;font-weight:bold;font-size:16px;color:${col(totalB, totalA)}">${totalB}</td>
+  </tr>`;
+
+  h += `</tbody></table></div></div>`;
+  return h;
+}
+
 // Load matches data for opens
 function loadOpenMatchesData(opens) {
   const container = document.getElementById('matches-list');
-  let html = '';
+  let html = renderOpensScoreboard(opens);
 
   if (opens.crossSplit) {
     const pairedFemaleCount = opens.crossSplit.pairedFemaleCount || 0;
@@ -846,11 +907,11 @@ function loadOpenMatchesData(opens) {
           <div style="padding:5px 10px;background:#e0e0e0;font-size:13px;font-weight:bold;">第${i + 1}组</div>
           <div style="display:flex;">
             <div style="flex:1;padding:8px 12px;background:#e8eaf6;border-right:2px solid #fff;">
-              <div style="font-size:11px;font-weight:bold;color:#5c6bc0;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">Team A</div>
+              <div style="font-size:11px;font-weight:bold;color:#5c6bc0;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">Team 野茫茫</div>
               ${(g.ht || []).map((p, j) => `<div style="font-size:13px;padding:2px 0;">${j + 1}. ${p.name}</div>`).join('')}
             </div>
             <div style="flex:1;padding:8px 12px;background:#fce4ec;">
-              <div style="font-size:11px;font-weight:bold;color:#e91e8c;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">Team B</div>
+              <div style="font-size:11px;font-weight:bold;color:#e91e8c;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;">Team 天苍苍</div>
               ${(g.xy || []).map((p, j) => `<div style="font-size:13px;padding:2px 0;">${j + 1}. ${p.name}</div>`).join('')}
             </div>
           </div>
@@ -967,14 +1028,28 @@ async function submitOpensScore(event) {
     return;
   }
   
-  // Update match score
-  window.currentOpens.matches[matchIndex].score1 = score1;
-  window.currentOpens.matches[matchIndex].score2 = score2;
-  window.currentOpens.matches[matchIndex].completed = true;
-  
-  // Update on server
-  await updateDataToServer(`/api/opens/${window.currentOpens.id}`, window.currentOpens);
+  // Update on server — send only the targeted score update to avoid overwriting
+  // other users' concurrent score submissions
+  const result = await updateDataToServer(
+    `/api/opens/${window.currentOpens.id}/score`,
+    { matchIndex: parseInt(matchIndex), score1, score2 }
+  );
+  if (result && Array.isArray(result.matches)) {
+    window.currentOpens = result;
+  } else {
+    // Fallback: apply locally if server response is unexpected
+    window.currentOpens.matches[matchIndex].score1 = score1;
+    window.currentOpens.matches[matchIndex].score2 = score2;
+    window.currentOpens.matches[matchIndex].completed = true;
+  }
   alert('比分提交成功！');
+
+  // Reset form back to default state
+  document.getElementById('opens-score-match').value = '';
+  document.getElementById('opens-score1').value = '';
+  document.getElementById('opens-score2').value = '';
+  document.getElementById('opens-score-inputs').style.display = 'none';
+
   loadOpenMatchesData(window.currentOpens);
 }
 

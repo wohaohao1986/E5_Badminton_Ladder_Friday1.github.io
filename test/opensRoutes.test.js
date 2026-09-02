@@ -165,6 +165,76 @@ describe('PUT /:id — update opens', () => {
   });
 });
 
+// ─── PUT /:id/score ──────────────────────────────────────────────────────────
+describe('PUT /:id/score — record a match score', () => {
+  const matchingOpens = () => sampleOpens({
+    matches: [
+      { type: 'males', group: 1, team1: ['A1', 'A2'], team2: ['B1', 'B2'], completed: false, score1: null, score2: null },
+      { type: 'females', group: 1, team1: ['C1', 'C2'], team2: ['D1', 'D2'], completed: false, score1: null, score2: null },
+    ],
+  });
+
+  beforeEach(() => {
+    mockOpensStore.opens = [matchingOpens()];
+  });
+
+  test('records the score for the specified match index', async () => {
+    const res = await request(buildApp()).put('/TestOpens-2026-06-01/score').send({ matchIndex: 0, score1: 21, score2: 15 });
+    expect(res.status).toBe(200);
+    expect(res.body.matches[0].score1).toBe(21);
+    expect(res.body.matches[0].score2).toBe(15);
+    expect(res.body.matches[0].completed).toBe(true);
+  });
+
+  test('does not affect other matches', async () => {
+    await request(buildApp()).put('/TestOpens-2026-06-01/score').send({ matchIndex: 0, score1: 21, score2: 15 });
+    expect(mockOpensStore.opens[0].matches[1].completed).toBe(false);
+    expect(mockOpensStore.opens[0].matches[1].score1).toBeNull();
+  });
+
+  test('persists the score to the store', async () => {
+    await request(buildApp()).put('/TestOpens-2026-06-01/score').send({ matchIndex: 1, score1: 17, score2: 21 });
+    expect(mockOpensStore.opens[0].matches[1].score1).toBe(17);
+    expect(mockOpensStore.opens[0].matches[1].score2).toBe(21);
+    expect(mockOpensStore.opens[0].matches[1].completed).toBe(true);
+  });
+
+  test('returns 400 when matchIndex is missing', async () => {
+    const res = await request(buildApp()).put('/TestOpens-2026-06-01/score').send({ score1: 21, score2: 15 });
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 400 when scores are missing', async () => {
+    const res = await request(buildApp()).put('/TestOpens-2026-06-01/score').send({ matchIndex: 0 });
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 400 for invalid (negative) matchIndex', async () => {
+    const res = await request(buildApp()).put('/TestOpens-2026-06-01/score').send({ matchIndex: -1, score1: 21, score2: 15 });
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 400 when scores are not numbers', async () => {
+    const res = await request(buildApp()).put('/TestOpens-2026-06-01/score').send({ matchIndex: 0, score1: '21', score2: 15 });
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 400 for negative scores', async () => {
+    const res = await request(buildApp()).put('/TestOpens-2026-06-01/score').send({ matchIndex: 0, score1: -1, score2: 15 });
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 400 when matchIndex is out of range', async () => {
+    const res = await request(buildApp()).put('/TestOpens-2026-06-01/score').send({ matchIndex: 99, score1: 21, score2: 15 });
+    expect(res.status).toBe(400);
+  });
+
+  test('returns 404 when opens is not found', async () => {
+    const res = await request(buildApp()).put('/no-such-id/score').send({ matchIndex: 0, score1: 21, score2: 15 });
+    expect(res.status).toBe(404);
+  });
+});
+
 // ─── DELETE /:id ─────────────────────────────────────────────────────────────
 describe('DELETE /:id — delete opens', () => {
   beforeEach(() => {
