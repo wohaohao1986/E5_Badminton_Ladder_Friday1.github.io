@@ -9,6 +9,88 @@ let expandedPlayers = new Set();
 // Cached admin credentials for this page session (cleared on page refresh)
 let _cachedAdminCredentials = null;
 
+// Season tracking for UI
+let selectedSeasonForRanking = null;
+let selectedSeasonForHistory = null;
+
+// Helper: Get season label (e.g., "2026/27")
+function getSeasonLabel(seasonKey) {
+  return seasonKey || '未知';
+}
+
+// Helper: Get season date range
+function getSeasonDateRange(seasonKey) {
+  if (!seasonKey) return '';
+  const parts = seasonKey.split('/');
+  if (parts.length !== 2) return '';
+  const startYear = parts[0];
+  const endYear = '20' + parts[1];
+  return `${startYear}年9月 - ${endYear}年5月`;
+}
+
+// Helper: Get season status label
+function getSeasonStatusLabel(status) {
+  return status === 'active' ? '(当前)' : '(已结束)';
+}
+
+function getPlayerSeasonDisplayData(player, seasonKey) {
+  if (!player) return null;
+
+  if (seasonKey === data.currentSeason) {
+    const seasonRounds = Array.isArray(data.roundHistory?.[seasonKey]) ? data.roundHistory[seasonKey] : [];
+    const seasonMatches = Array.isArray(data.matchHistory?.[seasonKey]) ? data.matchHistory[seasonKey] : [];
+    // player.ranking is authoritative; round history order diverges for promoted/relegated players
+    const currentRanking = typeof player.ranking === 'number' ? player.ranking : '-';
+    const roundsPlayed = seasonRounds.filter(round => Array.isArray(round.rankings) && round.rankings.some(r => r.name === player.name && r.category === player.category)).length;
+    const playerMatches = seasonMatches.filter(match => match.completed && ((match.team1 || []).includes(player.id) || (match.team2 || []).includes(player.id)));
+    const playerMatchesTwentyOne = playerMatches.filter(match => Math.max(match.score1 || 0, match.score2 || 0) === 21);
+    const playerMatchesFifteen = playerMatches.filter(match => Math.max(match.score1 || 0, match.score2 || 0) === 15);
+
+    return {
+      ranking: currentRanking,
+      avgRankInCat: typeof player.avgRankInCat === 'number' ? player.avgRankInCat : '-',
+      roundPlayed: roundsPlayed,
+      numberOfMatchesTwentyOne: playerMatchesTwentyOne.length,
+      winsTwentyOne: playerMatchesTwentyOne.reduce((wins, match) => wins + ((match.team1 || []).includes(player.id)
+        ? (match.score1 > match.score2 ? 1 : 0)
+        : (match.score2 > match.score1 ? 1 : 0)), 0),
+      totalNetScoreTwentyOne: playerMatchesTwentyOne.reduce((total, match) => total + ((match.team1 || []).includes(player.id)
+        ? ((match.score1 || 0) - (match.score2 || 0))
+        : ((match.score2 || 0) - (match.score1 || 0))), 0),
+      numberOfMatchesFifteen: playerMatchesFifteen.length,
+      winsFifteen: playerMatchesFifteen.reduce((wins, match) => wins + ((match.team1 || []).includes(player.id)
+        ? (match.score1 > match.score2 ? 1 : 0)
+        : (match.score2 > match.score1 ? 1 : 0)), 0),
+      totalNetScoreFifteen: playerMatchesFifteen.reduce((total, match) => total + ((match.team1 || []).includes(player.id)
+        ? ((match.score1 || 0) - (match.score2 || 0))
+        : ((match.score2 || 0) - (match.score1 || 0))), 0),
+      statusText: player.active ? '参赛' : '未参赛'
+    };
+  }
+
+  const seasonSnapshot = player.seasonHistory?.[seasonKey];
+  if (!seasonSnapshot) {
+    return {
+      ranking: '-', avgRankInCat: '-', roundPlayed: 0,
+      numberOfMatchesTwentyOne: 0, winsTwentyOne: 0, totalNetScoreTwentyOne: 0,
+      numberOfMatchesFifteen: 0, winsFifteen: 0, totalNetScoreFifteen: 0,
+      statusText: '未参赛'
+    };
+  }
+  return {
+    ranking: typeof seasonSnapshot.finalRanking === 'number' ? seasonSnapshot.finalRanking : '-',
+    avgRankInCat: typeof seasonSnapshot.avgRankInCat === 'number' ? seasonSnapshot.avgRankInCat : '-',
+    roundPlayed: seasonSnapshot.roundsPlayed || 0,
+    numberOfMatchesTwentyOne: seasonSnapshot.numberOfMatches || 0,
+    winsTwentyOne: seasonSnapshot.wins || 0,
+    totalNetScoreTwentyOne: seasonSnapshot.totalNetScore || 0,
+    numberOfMatchesFifteen: 0,
+    winsFifteen: 0,
+    totalNetScoreFifteen: 0,
+    statusText: '已结算'
+  };
+}
+
 // Main data store — populated by syncDataFromServer() on page load
 let data;
 let dataOpens;
@@ -168,6 +250,34 @@ function sortRankingBy(cat, field) {
 function renderRanking() {
   const container = document.getElementById('ranking-list');
   let html = '';
+  
+  // Initialize season selector if not already set
+  if (!selectedSeasonForRanking && data.currentSeason) {
+    selectedSeasonForRanking = data.currentSeason;
+  }
+  
+  // Add season selector
+  const seasons = data.seasons || {};
+  const seasonKeys = Object.keys(seasons).sort().reverse();
+  if (seasonKeys.length > 0) {
+    html += `<div style="margin-bottom:20px;padding:15px;background:#f0f7f0;border-radius:6px;">
+      <label style="font-weight:bold;margin-right:10px;">赛季选择：</label>
+      <select onchange="selectedSeasonForRanking = this.value; renderRanking()" style="padding:8px 12px;border:1px solid #4CAF50;border-radius:4px;font-size:14px;">`;
+    
+    seasonKeys.forEach(seasonKey => {
+      const season = seasons[seasonKey];
+      const label = getSeasonLabel(seasonKey);
+      const status = getSeasonStatusLabel(season.status);
+      const selected = (selectedSeasonForRanking === seasonKey) ? 'selected' : '';
+      html += `<option value="${seasonKey}" ${selected}>📊 ${label} ${status}</option>`;
+    });
+    
+    html += `</select>
+      <span style="margin-left:15px;color:#666;font-size:13px;">
+        📅 ${getSeasonDateRange(selectedSeasonForRanking)}
+      </span>
+    </div>`;
+  }
 
   Object.keys(CATEGORIES).forEach(cat => {
     const catPlayers = data.players.filter(p => p.category === cat).sort((a, b) => {
@@ -183,20 +293,23 @@ function renderRanking() {
       return ' <span style="color:#bbb;font-size:11px;">⇅</span>';
     };
 
+    const displaySeasonKey = selectedSeasonForRanking || data.currentSeason;
     // Sort a display-only copy — original data is never mutated
     const displayPlayers = [...catPlayers].sort((a, b) => {
       const dir = state.dir === 'asc' ? 1 : -1;
+      const aSeason = getPlayerSeasonDisplayData(a, displaySeasonKey);
+      const bSeason = getPlayerSeasonDisplayData(b, displaySeasonKey);
       if (state.field === 'avgRank') {
-        const ra = typeof a.avgRankInCat === 'number' ? a.avgRankInCat : Infinity;
-        const rb = typeof b.avgRankInCat === 'number' ? b.avgRankInCat : Infinity;
+        const ra = typeof aSeason.avgRankInCat === 'number' ? aSeason.avgRankInCat : Infinity;
+        const rb = typeof bSeason.avgRankInCat === 'number' ? bSeason.avgRankInCat : Infinity;
         return (ra - rb) * dir;
       }
       if (state.field === 'roundPlayed') {
-        return ((a.roundPlayed || 0) - (b.roundPlayed || 0)) * dir;
+        return ((aSeason.roundPlayed || 0) - (bSeason.roundPlayed || 0)) * dir;
       }
       // default: ranking
-      const ra = typeof a.ranking === 'number' ? a.ranking : Infinity;
-      const rb = typeof b.ranking === 'number' ? b.ranking : Infinity;
+      const ra = typeof aSeason.ranking === 'number' ? aSeason.ranking : Infinity;
+      const rb = typeof bSeason.ranking === 'number' ? bSeason.ranking : Infinity;
       return (ra - rb) * dir;
     });
 
@@ -230,17 +343,17 @@ function renderRanking() {
       </tr></thead><tbody>`;
 
     displayPlayers.forEach(p => {
-      const statusClass = p.active ? '' : 'player-inactive';
-      const statusText = p.active ? '参赛' : '未参赛';
-      const rankDisplay = typeof p.ranking === 'number' ? p.ranking : '-';
-      const avgRankInCat = typeof p.avgRankInCat === 'number' ? p.avgRankInCat : '-';
-      const roundPlayed = p.roundPlayed || 0;
-      const numberOfMatchesTwentyOne = p.numberOfMatchesTwentyOne || 0;
-      const winsTwentyOne = p.winsTwentyOne || 0;
-      const totalNetScoreTwentyOne = p.totalNetScoreTwentyOne || 0;
-      const numberOfMatchesFifteen = p.numberOfMatchesFifteen || 0;
-      const winsFifteen = p.winsFifteen || 0;
-      const totalNetScoreFifteen = p.totalNetScoreFifteen || 0;
+      const seasonData = getPlayerSeasonDisplayData(p, displaySeasonKey);
+      const statusClass = seasonData.statusText === '未参赛' ? 'player-inactive' : '';
+      const rankDisplay = seasonData.ranking;
+      const avgRankInCat = seasonData.avgRankInCat;
+      const roundPlayed = seasonData.roundPlayed;
+      const numberOfMatchesTwentyOne = seasonData.numberOfMatchesTwentyOne;
+      const winsTwentyOne = seasonData.winsTwentyOne;
+      const totalNetScoreTwentyOne = seasonData.totalNetScoreTwentyOne;
+      const numberOfMatchesFifteen = seasonData.numberOfMatchesFifteen;
+      const winsFifteen = seasonData.winsFifteen;
+      const totalNetScoreFifteen = seasonData.totalNetScoreFifteen;
       html += `<tr class="${statusClass}" style="border-bottom:1px solid #ddd;">
         <td style="${td}">#${rankDisplay}</td>
         <td style="${tdName}">${p.name}</td>
@@ -252,7 +365,7 @@ function renderRanking() {
         <td style="${td}">${numberOfMatchesFifteen}</td>
         <td style="${td}">${winsFifteen}</td>
         <td style="${td}">${totalNetScoreFifteen}</td>
-        <td style="${td}color:#666;">${statusText}</td>
+        <td style="${td}color:#666;">${seasonData.statusText}</td>
       </tr>`;
     });
     html += '</tbody></table></div>';
@@ -263,23 +376,120 @@ function renderRanking() {
 
 function renderHistory() {
   const container = document.getElementById('history-content');
+  if (!container) return;
+  
+  // Initialize season selector if not already set
+  if (!selectedSeasonForHistory && data.seasons) {
+    const seasonEntries = Object.entries(data.seasons);
+    const populatedSeason = [...seasonEntries]
+      .sort(([a], [b]) => b.localeCompare(a)) // most recent first
+      .find(([seasonKey]) => {
+        const roundHistory = Array.isArray(data.roundHistory?.[seasonKey]) ? data.roundHistory[seasonKey] : [];
+        const matchHistory = Array.isArray(data.matchHistory?.[seasonKey]) ? data.matchHistory[seasonKey] : [];
+        return roundHistory.length > 0 || matchHistory.length > 0;
+      });
+    selectedSeasonForHistory = populatedSeason ? populatedSeason[0] : data.currentSeason;
+  }
+  
+  // Add season selector and info
+  const seasons = data.seasons || {};
+  const seasonKeys = Object.keys(seasons).sort().reverse();
+  let html = '';
+  
+  if (seasonKeys.length > 0) {
+    html += `<div style="margin-bottom:20px;padding:15px;background:#f0f7f0;border-radius:6px;">
+      <label style="font-weight:bold;margin-right:10px;">赛季选择：</label>
+      <select onchange="selectedSeasonForHistory = this.value; renderHistory()" style="padding:8px 12px;border:1px solid #4CAF50;border-radius:4px;font-size:14px;">`;
+    
+    seasonKeys.forEach(seasonKey => {
+      const season = seasons[seasonKey];
+      const label = getSeasonLabel(seasonKey);
+      const status = getSeasonStatusLabel(season.status);
+      const selected = (selectedSeasonForHistory === seasonKey) ? 'selected' : '';
+      html += `<option value="${seasonKey}" ${selected}>📊 ${label} ${status}</option>`;
+    });
+    
+    html += `</select>
+      <span style="margin-left:15px;color:#666;font-size:13px;">
+        📅 ${getSeasonDateRange(selectedSeasonForHistory)}
+      </span>
+    </div>`;
+  }
+  
+  // Get history for selected season
+  const roundHistoryByKey = data.roundHistory || {};
+  const matchHistoryByKey = data.matchHistory || {};
+  
+  const selectedRoundHistory = Array.isArray(roundHistoryByKey[selectedSeasonForHistory]) ? roundHistoryByKey[selectedSeasonForHistory] : [];
+  const selectedMatchHistory = Array.isArray(matchHistoryByKey[selectedSeasonForHistory]) ? matchHistoryByKey[selectedSeasonForHistory] : [];
+
+  const storedFinalRound = data.seasons?.[selectedSeasonForHistory]?.finalRound;
+
+  html += `<div class="card">
+    <div class="mb-15">
+      <label style="display: block; margin-bottom: 5px; font-weight: bold;">选择轮次</label>
+      <select id="round-select" onchange="updateRoundHistory()">
+        <option value="">-- 请选择 --</option>
+      </select>
+    </div>
+    <div id="round-history" class="hidden"></div>
+  </div>`;
+
+  container.innerHTML = html;
+
   const select = document.getElementById('round-select');
-  if (!data || !data.matchHistory || data.matchHistory.length === 0) {
-    container.innerHTML = '<div class="card"><p>暂无历史记录</p></div>';
+  const roundHistoryContainer = document.getElementById('round-history');
+  if (!select || !roundHistoryContainer) return;
+
+  if (selectedRoundHistory.length === 0 && selectedMatchHistory.length === 0) {
+    roundHistoryContainer.classList.remove('hidden');
+    roundHistoryContainer.innerHTML = '<div class="card"><p>该赛季暂无历史记录</p></div>';
     return;
   }
+
+  // Only show rounds that actually exist in this season's history
+  const roundNumbers = [...new Set(selectedRoundHistory.map(r => r.round))].sort((a, b) => b - a);
+
   select.innerHTML = '<option value="">-- 请选择 --</option>';
-  for (let r = data.currentRound - 1; r > 0; r--) {
+  roundNumbers.forEach(r => {
     select.innerHTML += `<option value="${r}">第${r}轮</option>`;
-  }
+  });
+
+  if (roundNumbers.length > 0) select.value = String(roundNumbers[0]);
+  updateRoundHistory();
 }
 
 function updateRoundHistory(){
   const container = document.getElementById('round-history');
-  const round = document.getElementById('round-select').value;
+  const roundSelect = document.getElementById('round-select');
+  if (!container || !roundSelect) return;
+  const round = roundSelect.value;
+  
+  // Initialize season if not set
+  if (!selectedSeasonForHistory && data.currentSeason) {
+    selectedSeasonForHistory = data.currentSeason;
+  }
 
-  const roundHistory = data.roundHistory.filter(item => item.round.toString() === round)[0];
-  const roundMatches = data.matchHistory.filter(m => m.round.toString() === round && m.completed);
+  const roundHistoryByKey = data.roundHistory || {};
+  const matchHistoryByKey = data.matchHistory || {};
+  
+  const selectedRoundHistory = Array.isArray(roundHistoryByKey[selectedSeasonForHistory]) ? roundHistoryByKey[selectedSeasonForHistory] : [];
+  const selectedMatchHistory = Array.isArray(matchHistoryByKey[selectedSeasonForHistory]) ? matchHistoryByKey[selectedSeasonForHistory] : [];
+
+  const roundHistory = selectedRoundHistory.filter(item => item.round.toString() === round)[0];
+  const roundMatches = selectedMatchHistory.filter(m => m.round.toString() === round && m.completed);
+
+  if (!round) {
+    container.classList.remove('hidden');
+    container.innerHTML = '<div class="card"><p>请选择轮次查看详情</p></div>';
+    return;
+  }
+
+  if (!roundHistory) {
+    container.classList.remove('hidden');
+    container.innerHTML = '<div class="card"><p>该轮次暂无历史记录</p></div>';
+    return;
+  }
 
   let html = `<div class="card"><h2>第 ${round} 轮</h2>`;
 
@@ -388,12 +598,31 @@ function renderAdmin() {
 
   const currentMatches = data && data.matches ? data.matches.filter(m => m.round === data.currentRound) : [];
   const currentGroups = data && data.groups ? data.groups : [];
+  const currentSeason = data.currentSeason || '未知';
+  
   document.getElementById('stat-round').textContent = data.currentRound;
   document.getElementById('stat-players').textContent = data.players.length;
   document.getElementById('stat-active').textContent = activePlayers.length;
   document.getElementById('stat-groups').textContent = currentGroups.length;
   document.getElementById('stat-matches').textContent = currentMatches.length;
   document.getElementById('stat-completed').textContent = currentMatches.filter(m => m.completed).length;
+  
+  // Add season info and new season button
+  const seasonCard = document.getElementById('season-card');
+  if (seasonCard) {
+    const dateRange = getSeasonDateRange(currentSeason);
+    seasonCard.innerHTML = `
+      <h2>赛季管理</h2>
+      <p style="margin-bottom: 10px;">
+        <strong>当前赛季：</strong> 
+        <span style="color:#4CAF50;font-size:16px;font-weight:bold;">${currentSeason}</span>
+        <span style="color:#666;margin-left:10px;">${dateRange}</span>
+      </p>
+      <button onclick="startNewSeason()" class="btn-danger" style="margin-top:10px;">
+        🚀 启动新赛季（管理员）
+      </button>
+    `;
+  }
 }
 
 // Toggle player buttons visibility
@@ -774,6 +1003,42 @@ async function finishRound() {
   renderMatch();
   renderHistory();
   renderRanking();
+}
+
+async function startNewSeason() {
+  const confirmed = confirm(
+    '启动新赛季将：\n' +
+    '1. 保存所有选手的平均排名\n' +
+    '2. 重置所有比赛数据\n' +
+    '3. 清空分组和本轮次数\n\n' +
+    '确定要启动新赛季吗？'
+  );
+  
+  if (!confirmed) return;
+  
+  const credentials = await promptForAdminCredentials();
+  if (!credentials) return;
+  
+  try {
+    const response = await updateDataToServer('/api/season/new', {
+      adminName: credentials.name,
+      adminPassword: credentials.password
+    });
+    
+    if (response && response.success) {
+      alert('✅ ' + response.message);
+      await syncDataFromServer();
+      renderAdmin();
+      renderMatch();
+      renderHistory();
+      renderRanking();
+    } else {
+      alert('❌ 启动失败：' + (response?.message || '未知错误'));
+    }
+  } catch (error) {
+    console.error('Error starting new season:', error);
+    alert('❌ 启动失败：' + error.message);
+  }
 }
 
 async function calculateAvgRanking() {

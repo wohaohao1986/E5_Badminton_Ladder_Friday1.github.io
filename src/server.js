@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const { safeReadJson, safeWriteJson, logToFile, DATA_FILE, ADMIN_CONFIG_FILE } = require('./utils/fileUtils');
-const { currentDateTime, sortPlayersByRanking, generateGroups, generateMatches, generateGroupsAndMatches, finishRound, autoFillScores, calculatePlayerStats, calculateAllPlayerAvgRankInCat, resetGroupLogic, rearrangeGroups } = require('./utils/dataUtils');
+const { currentDateTime, sortPlayersByRanking, generateGroups, generateMatches, generateGroupsAndMatches, finishRound, autoFillScores, calculatePlayerStats, calculateAllPlayerAvgRankInCat, resetGroupLogic, rearrangeGroups, startNewSeason, normalizeSeasonData } = require('./utils/dataUtils');
 
 // Import route handlers
 const playerRoutes = require('./routes/playerRoutes');
@@ -23,7 +23,7 @@ app.use((req, res, next) => {
 
 // Endpoint to get main data
 app.get('/api/main', (req, res) => {
-  const data = safeReadJson(DATA_FILE, { players: [], groups: [], matches: [], currentRound: 1, roundHistory: [] });
+  const data = normalizeSeasonData(safeReadJson(DATA_FILE, { players: [], groups: [], matches: [], currentRound: 1, roundHistory: [], matchHistory: [] }));
   sortPlayersByRanking(data.players);
   res.json(data);
 });
@@ -151,6 +151,36 @@ app.put('/api/resetGroup', (req, res) => {
   }
 });
 
+// PUT: Start a new season (requires admin authentication)
+app.put('/api/season/new', (req, res) => {
+  const { adminName, adminPassword } = req.body;
+  
+  // Verify admin credentials
+  if (!adminName || !adminPassword) {
+    return res.status(400).json({ success: false, message: '请提供管理员用户名和密码' });
+  }
+  
+  try {
+    const adminInfo = safeReadJson(ADMIN_CONFIG_FILE, { admin: { username: 'admin', password: 'admin' } });
+    if (adminName !== adminInfo.admin.username || adminPassword !== adminInfo.admin.password) {
+      logToFile(`Unauthorized new season attempt with user: ${adminName}`);
+      return res.status(401).json({ success: false, message: '用户名或密码错误，权限不足' });
+    }
+    
+    logToFile(`New season initiated by admin: ${adminName}`);
+    const result = startNewSeason();
+    
+    if (result.success) {
+      res.json({ success: true, message: result.message });
+    } else {
+      res.status(400).json({ success: false, message: result.message });
+    }
+  } catch (error) {
+    logToFile(`Error starting new season: ${error.message}`);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Mount API routes
 app.use('/api/player', playerRoutes);
 app.use('/api/match', matchRoutes);
@@ -160,6 +190,11 @@ app.use('/api/opens', opensRoutes);
 app.use(express.static(path.join(__dirname)));
 
 const PORT = process.env.PORT || 80;
-app.listen(PORT, '0.0.0.0', () => {
-  logToFile(`Server is running on port ${PORT}`);
-});
+
+if (require.main === module) {
+  app.listen(PORT, '0.0.0.0', () => {
+    logToFile(`Server is running on port ${PORT}`);
+  });
+}
+
+module.exports = app;

@@ -1,13 +1,177 @@
 const { DATA_FILE, ADMIN_CONFIG_FILE, safeReadJson, safeWriteJson, logToFile } = require('./fileUtils');
 const CATEGORIES = { huitailang: '灰太狼', xiyangyang: '喜羊羊' };
 const CATEGORY_ORDER = ['huitailang', 'xiyangyang'];
-const DEFAULT_DATA = { players: [], groups: [], matches: [], currentRound: 1, roundHistory: [], matchHistory: [] };
+
+// Helper: Calculate season for a given date (YYYY/YY format)
+// Season runs Sept-May, so if month is 9-12, it's (YYYY)/(YY+1), else (YYYY-1)/(YY)
+function getSeasonForDate(date = new Date()) {
+  const now = date instanceof Date ? date : new Date(date);
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1; // 1-12
+  if (month >= 9) {
+    return `${year}/${String(year + 1).slice(-2)}`;
+  } else {
+    return `${year - 1}/${String(year).slice(-2)}`;
+  }
+}
+
+function getCurrentSeason(date = new Date()) {
+  return getSeasonForDate(date);
+}
+
+function getPreviousSeason(seasonId) {
+  if (!seasonId || typeof seasonId !== 'string') return null;
+  const parts = seasonId.split('/');
+  if (parts.length !== 2) return null;
+
+  const startYear = parseInt(parts[0], 10);
+  if (Number.isNaN(startYear)) return null;
+
+  const previousStartYear = startYear - 1;
+  return `${previousStartYear}/${String(startYear).slice(-2)}`;
+}
+
+function getNextSeason(seasonId) {
+  if (!seasonId || typeof seasonId !== 'string') return null;
+  const parts = seasonId.split('/');
+  if (parts.length !== 2) return null;
+
+  const startYear = parseInt(parts[0], 10);
+  if (Number.isNaN(startYear)) return null;
+
+  const nextStartYear = startYear + 1;
+  return `${nextStartYear}/${String(nextStartYear + 1).slice(-2)}`;
+}
+
+function getNextSeasonForStoredData(data) {
+  const currentSeasonByDate = getCurrentSeason();
+  const storedSeason = data && typeof data.currentSeason === 'string' ? data.currentSeason : null;
+
+  if (!storedSeason) {
+    return currentSeasonByDate;
+  }
+
+  const storedStartYear = getSeasonStartYear(storedSeason);
+  const currentStartYear = getSeasonStartYear(currentSeasonByDate);
+
+  if (!Number.isFinite(storedStartYear) || !Number.isFinite(currentStartYear)) {
+    return currentSeasonByDate;
+  }
+
+  if (storedStartYear < currentStartYear) {
+    return currentSeasonByDate;
+  }
+
+  return getNextSeason(storedSeason) || currentSeasonByDate;
+}
+
+function getSeasonStartYear(seasonId) {
+  if (!seasonId || typeof seasonId !== 'string') return Number.NEGATIVE_INFINITY;
+  const parts = seasonId.split('/');
+  if (parts.length !== 2) return Number.NEGATIVE_INFINITY;
+  const startYear = parseInt(parts[0], 10);
+  return Number.isNaN(startYear) ? Number.NEGATIVE_INFINITY : startYear;
+}
+
+function getSeasonKeysInOrder(data) {
+  if (!data || typeof data !== 'object' || !data.roundHistory || typeof data.roundHistory !== 'object' || Array.isArray(data.roundHistory)) {
+    return [];
+  }
+
+  return Object.keys(data.roundHistory).sort((a, b) => getSeasonStartYear(a) - getSeasonStartYear(b));
+}
+
+// Initialize a new season in the data structure
+function initializeSeason(seasonId) {
+  return {
+    status: 'active',
+    startDate: seasonId.split('/')[0] + '-09-01',
+    endDate: '20' + seasonId.split('/')[1] + '-05-31',
+    currentRound: 1
+  };
+}
+
+function normalizeSeasonData(data) {
+  if (!data || typeof data !== 'object') {
+    return { ...DEFAULT_DATA };
+  }
+
+  const normalized = data;
+  const hasLegacyRoundHistory = Array.isArray(normalized.roundHistory);
+  const hasLegacyMatchHistory = Array.isArray(normalized.matchHistory);
+  const hasLegacyHistoryContent = (hasLegacyRoundHistory && normalized.roundHistory.length > 0) || (hasLegacyMatchHistory && normalized.matchHistory.length > 0);
+  const hasSeasonMetadata = normalized.currentSeason || (normalized.seasons && typeof normalized.seasons === 'object' && !Array.isArray(normalized.seasons));
+
+  // Migrate legacy arrays even when season metadata is already present (e.g. currentSeason added manually while roundHistory is still an array)
+  if (hasSeasonMetadata && (Array.isArray(normalized.roundHistory) || Array.isArray(normalized.matchHistory))) {
+    const currentSeason = normalized.currentSeason || getCurrentSeason();
+    if (Array.isArray(normalized.roundHistory)) {
+      normalized.roundHistory = { [currentSeason]: normalized.roundHistory };
+    }
+    if (Array.isArray(normalized.matchHistory)) {
+      normalized.matchHistory = { [currentSeason]: normalized.matchHistory };
+    }
+  }
+
+  if (!hasSeasonMetadata && hasLegacyHistoryContent) {
+    const currentSeason = getPreviousSeason(getCurrentSeason()) || getCurrentSeason();
+
+    normalized.currentSeason = currentSeason;
+    if (!normalized.seasons || typeof normalized.seasons !== 'object' || Array.isArray(normalized.seasons)) {
+      normalized.seasons = {};
+    }
+    normalized.seasons[currentSeason] = initializeSeason(currentSeason);
+
+    const seasonCurrentRound = typeof normalized.currentRound === 'number' && normalized.currentRound > 0
+      ? normalized.currentRound
+      : 1;
+    normalized.currentRound = seasonCurrentRound;
+    normalized.seasons[currentSeason].currentRound = seasonCurrentRound;
+
+    if (Array.isArray(normalized.roundHistory)) {
+      normalized.roundHistory = { [currentSeason]: normalized.roundHistory };
+    } else if (!normalized.roundHistory || typeof normalized.roundHistory !== 'object') {
+      normalized.roundHistory = { [currentSeason]: [] };
+    }
+    if (!Array.isArray(normalized.roundHistory[currentSeason])) {
+      normalized.roundHistory[currentSeason] = [];
+    }
+
+    if (Array.isArray(normalized.matchHistory)) {
+      normalized.matchHistory = { [currentSeason]: normalized.matchHistory };
+    } else if (!normalized.matchHistory || typeof normalized.matchHistory !== 'object') {
+      normalized.matchHistory = { [currentSeason]: [] };
+    }
+    if (!Array.isArray(normalized.matchHistory[currentSeason])) {
+      normalized.matchHistory[currentSeason] = [];
+    }
+  }
+
+  return normalized;
+}
+
+const DEFAULT_DATA = {
+  currentSeason: getCurrentSeason(),
+  seasons: {
+    [getCurrentSeason()]: initializeSeason(getCurrentSeason())
+  },
+  players: [],
+  groups: [],
+  matches: [],
+  currentRound: 1,
+  roundHistory: {
+    [getCurrentSeason()]: []
+  },
+  matchHistory: {
+    [getCurrentSeason()]: []
+  }
+};
 const currentDateTime = () => new Date().toLocaleString('en-US', {
    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
 });
 
 // ========== CORE HELPERS ==========
-const loadData = () => safeReadJson(DATA_FILE, DEFAULT_DATA);
+const loadData = () => normalizeSeasonData(safeReadJson(DATA_FILE, DEFAULT_DATA));
 const getActivePlayers = (data, cat) => data.players.filter(p => p.active && p.category === cat).sort((a, b) => a.ranking - b.ranking);
 const findPlayer = (data, cond) => data.players.find(cond);
 const findPlayerIndex = (data, cond) => data.players.findIndex(cond);
@@ -114,7 +278,20 @@ const generateGroupsAndMatches = () => generateGroups() + '\n' + generateMatches
 // ========== RANK-RELATED HELPERS ==========
 function getLastRoundRankingInCategory(category) {
   const data = loadData();
-  const lastRound = data.roundHistory[data.roundHistory.length - 1];
+  
+  // Handle both old array format and new season-based format
+  let lastRound = null;
+  if (Array.isArray(data.roundHistory)) {
+    // Old format: array
+    lastRound = data.roundHistory[data.roundHistory.length - 1];
+  } else if (typeof data.roundHistory === 'object' && data.currentSeason) {
+    // New format: object keyed by season
+    const seasonHistory = data.roundHistory[data.currentSeason];
+    if (Array.isArray(seasonHistory) && seasonHistory.length > 0) {
+      lastRound = seasonHistory[seasonHistory.length - 1];
+    }
+  }
+  
   if (!lastRound) return null;
   
   const lastRoundRanking = [...lastRound.rankings.filter(r => r.category === category)];
@@ -265,6 +442,18 @@ function sortPlayersByRanking() {
 // ========== ROUND FINISHING ==========
 function finishRound() {
   const data = loadData();
+  
+  // Ensure season structure is initialized
+  if (!data.currentSeason) {
+    data.currentSeason = getCurrentSeason();
+  }
+  if (!data.seasons) {
+    data.seasons = {};
+  }
+  if (!data.seasons[data.currentSeason]) {
+    data.seasons[data.currentSeason] = initializeSeason(data.currentSeason);
+  }
+  
   const roundRankingsToChange = [];
   const categoryMessages = {};
   
@@ -309,7 +498,22 @@ function finishRound() {
     categoryMessages[cat] = `\n=== ${CATEGORIES[cat]} ===\n排名上升：${promoted.join(', ')}\n排名下降：${relegated.join(', ')}\n`;
   });
   
-  data.roundHistory.push({ round: data.currentRound, rankings: roundRankingsToChange });
+  // Support both old array format and new season-based object format
+  const currentSeason = data.currentSeason || getCurrentSeason();
+  if (!data.roundHistory) data.roundHistory = {};
+  if (typeof data.roundHistory === 'object' && !Array.isArray(data.roundHistory)) {
+    if (!data.roundHistory[currentSeason]) data.roundHistory[currentSeason] = [];
+  } else if (Array.isArray(data.roundHistory)) {
+    // Migrate old array-based history to season-based format
+    const oldHistory = data.roundHistory;
+    data.roundHistory = { [currentSeason]: oldHistory };
+  }
+  
+  // Push to the season-specific array
+  if (!Array.isArray(data.roundHistory[currentSeason])) {
+    data.roundHistory[currentSeason] = [];
+  }
+  data.roundHistory[currentSeason].push({ round: data.currentRound, rankings: roundRankingsToChange });
   
   const currentRoundMatches = data.matches.filter(m => m.round === data.currentRound);
   data.players.forEach(player => {
@@ -321,7 +525,22 @@ function finishRound() {
     }
   });
   
-  data.matchHistory.push(...currentRoundMatches);
+  // Support both old array format and new season-based object format
+  if (!data.matchHistory) data.matchHistory = {};
+  if (typeof data.matchHistory === 'object' && !Array.isArray(data.matchHistory)) {
+    if (!data.matchHistory[currentSeason]) data.matchHistory[currentSeason] = [];
+  } else if (Array.isArray(data.matchHistory)) {
+    // Migrate old array-based history to season-based format
+    const oldHistory = data.matchHistory;
+    data.matchHistory = { [currentSeason]: oldHistory };
+  }
+  
+  // Push to the season-specific array
+  if (!Array.isArray(data.matchHistory[currentSeason])) {
+    data.matchHistory[currentSeason] = [];
+  }
+  data.matchHistory[currentSeason].push(...currentRoundMatches);
+  
   data.matches = data.matches.filter(m => m.round !== data.currentRound);
   data.groups.length = 0;
   data.currentRound++;
@@ -335,6 +554,16 @@ function finishRound() {
 // ========== PLAYER STATS ==========
 function calculatePlayerStats() {
   const data = loadData();
+  
+  // Only count matches from the current season so stats reset cleanly at season boundaries.
+  const currentSeason = data.currentSeason || getCurrentSeason();
+  let currentSeasonMatches = [];
+  if (Array.isArray(data.matchHistory)) {
+    currentSeasonMatches = data.matchHistory;
+  } else if (data.matchHistory && typeof data.matchHistory === 'object') {
+    currentSeasonMatches = Array.isArray(data.matchHistory[currentSeason]) ? data.matchHistory[currentSeason] : [];
+  }
+  
   data.players.forEach(player => {
     // Reset before recalculating to prevent double-counting on repeated calls
     player.numberOfMatchesTwentyOne = 0;
@@ -344,8 +573,8 @@ function calculatePlayerStats() {
     player.winsFifteen = 0;
     player.totalNetScoreFifteen = 0;
     logToFile(`Calculating stats for player: ${player.name}`);
-    updatePlayerMatchStats(player, getPlayerMatches(data.matchHistory, player.id), 21);
-    updatePlayerMatchStats(player, getPlayerMatches(data.matchHistory, player.id), 15);
+    updatePlayerMatchStats(player, getPlayerMatches(currentSeasonMatches, player.id), 21);
+    updatePlayerMatchStats(player, getPlayerMatches(currentSeasonMatches, player.id), 15);
   });
   safeWriteJson(DATA_FILE, data);
 }
@@ -356,7 +585,23 @@ function _computeAvgRankForPlayer(data, playerName) {
 
   const ranks = [];
   let roundPlayed = 0;
-  data.roundHistory.forEach(round => {
+  
+  // Get all round history in chronological order (handle both old and new formats)
+  let allRounds = [];
+  if (Array.isArray(data.roundHistory)) {
+    // Old format: direct array
+    allRounds = data.roundHistory;
+  } else if (typeof data.roundHistory === 'object') {
+    // New format: object keyed by season
+    getSeasonKeysInOrder(data).forEach(seasonKey => {
+      const seasonRounds = data.roundHistory[seasonKey];
+      if (Array.isArray(seasonRounds)) {
+        allRounds.push(...seasonRounds);
+      }
+    });
+  }
+
+  allRounds.forEach(round => {
     const ranking = round.rankings.find(r => r.name === playerName);
     if (!ranking || ranking.category !== player.category) return;
 
@@ -511,7 +756,86 @@ function rearrangeGroups(data, category, newGroupSizes, currentRound) {
   return { success: true, message: `${CATEGORIES[category]}已重新排列为${newGroupSizes.join(',')}` };
 }
 
+// ========== SEASON MANAGEMENT ==========
+function startNewSeason() {
+  const data = loadData();
+  const oldSeason = data.currentSeason || getCurrentSeason();
+  const newSeason = getNextSeasonForStoredData(data);
+  
+  if (newSeason === oldSeason) {
+    return { success: false, message: `赛季未改变（当前：${newSeason}）` };
+  }
+  
+  // Archive old season
+  if (data.seasons && data.seasons[oldSeason]) {
+    data.seasons[oldSeason].status = 'archived';
+    // Derive finalRound from actual history — currentRound may already be reset to 1
+    const playedRounds = Array.isArray(data.roundHistory?.[oldSeason]) ? data.roundHistory[oldSeason] : [];
+    data.seasons[oldSeason].finalRound = playedRounds.length > 0
+      ? Math.max(...playedRounds.map(r => r.round))
+      : Math.max(data.currentRound - 1, 0);
+    data.seasons[oldSeason].endDate = new Date().toISOString().split('T')[0];
+  }
+  
+  // Initialize new season
+  data.currentSeason = newSeason;
+  if (!data.seasons) data.seasons = {};
+  data.seasons[newSeason] = initializeSeason(newSeason);
+  
+  // Prepare new season data: reset gameplay state, preserve player career data
+  data.players.forEach(player => {
+    // Initialize seasonHistory if not present (for migration)
+    if (!player.seasonHistory) {
+      player.seasonHistory = {};
+    }
+    
+    // Store old season stats
+    if (oldSeason && !player.seasonHistory[oldSeason]) {
+      player.seasonHistory[oldSeason] = {
+        finalRanking: player.ranking,
+        numberOfMatches: player.numberOfMatchesTwentyOne + player.numberOfMatchesFifteen,
+        wins: player.winsTwentyOne + player.winsFifteen,
+        totalNetScore: player.totalNetScoreTwentyOne + player.totalNetScoreFifteen,
+        roundsPlayed: player.roundPlayed,
+        avgRankInCat: player.avgRankInCat
+      };
+    }
+    
+    // Reset gameplay stats but preserve avgRankInCat
+    player.numberOfMatchesTwentyOne = 0;
+    player.winsTwentyOne = 0;
+    player.totalNetScoreTwentyOne = 0;
+    player.numberOfMatchesFifteen = 0;
+    player.winsFifteen = 0;
+    player.totalNetScoreFifteen = 0;
+    player.roundPlayed = 0;
+    player.returnCurrentRound = false;
+    // avgRankInCat is preserved from last season
+  });
+  
+  // Clear gameplay state for new season
+  data.matches = [];
+  data.groups = [];
+  data.currentRound = 1;
+  
+  // Migrate any remaining legacy array history before assigning new season keys
+  if (Array.isArray(data.roundHistory)) data.roundHistory = { [oldSeason]: data.roundHistory };
+  if (Array.isArray(data.matchHistory)) data.matchHistory = { [oldSeason]: data.matchHistory };
+
+  // Reset history tracking for new season
+  if (!data.roundHistory) data.roundHistory = {};
+  if (!data.matchHistory) data.matchHistory = {};
+  data.roundHistory[newSeason] = [];
+  data.matchHistory[newSeason] = [];
+  
+  safeWriteJson(DATA_FILE, data);
+  logToFile(`新赛季已启动：${newSeason}（上一赛季：${oldSeason}）`);
+  
+  return { success: true, message: `新赛季 ${newSeason} 已启动！所有选手的平均排名已保留，比赛轮次已重置。` };
+}
+
 module.exports = {
   CATEGORIES, currentDateTime, sortPlayersByRanking, generateGroups, generateMatches, generateGroupsAndMatches,
-  rerankPlayer, finishRound, autoFillScores, calculatePlayerStats, calculatePlayerAvgRankInCat, calculateAllPlayerAvgRankInCat, resetGroupLogic, rearrangeGroups
+  rerankPlayer, finishRound, autoFillScores, calculatePlayerStats, calculatePlayerAvgRankInCat, calculateAllPlayerAvgRankInCat, resetGroupLogic, rearrangeGroups,
+  getCurrentSeason, startNewSeason, normalizeSeasonData
 };

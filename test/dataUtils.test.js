@@ -11,6 +11,7 @@ const {
   CATEGORIES, rearrangeGroups, generateGroups, generateMatches, generateGroupsAndMatches,
   rerankPlayer, sortPlayersByRanking, finishRound, calculatePlayerStats,
   calculatePlayerAvgRankInCat, calculateAllPlayerAvgRankInCat, resetGroupLogic, autoFillScores,
+  startNewSeason, normalizeSeasonData,
 } = require('../src/utils/dataUtils');
 
 const makeDefaultData = (overrides = {}) => ({
@@ -419,6 +420,31 @@ describe('calculatePlayerStats', () => {
     expect(alice.numberOfMatchesTwentyOne).toBe(1);
     expect(alice.numberOfMatchesFifteen).toBe(1);
   });
+
+  test('uses only the current season match history when data is season-keyed', () => {
+    const p1 = makePlayer('p1', 'Alice');
+    const p2 = makePlayer('p2', 'Bob');
+    const currentMatch = makeMatch('current', ['p1'], ['p2'], 21, 12);
+    const archivedMatch = makeMatch('archived', ['p1'], ['p2'], 21, 18);
+
+    safeReadJson.mockReturnValue(makeDefaultData({
+      currentSeason: '2026/27',
+      players: [p1, p2],
+      matchHistory: {
+        '2025/26': [archivedMatch],
+        '2026/27': [currentMatch],
+      },
+    }));
+    safeWriteJson.mockImplementation(() => {});
+
+    calculatePlayerStats();
+
+    const saved = safeWriteJson.mock.calls[0][1];
+    const alice = saved.players.find(p => p.id === 'p1');
+    expect(alice.numberOfMatchesTwentyOne).toBe(1);
+    expect(alice.winsTwentyOne).toBe(1);
+    expect(alice.totalNetScoreTwentyOne).toBe(9);
+  });
 });
 
 // ─── calculatePlayerAvgRankInCat / calculateAllPlayerAvgRankInCat ─────────────
@@ -465,6 +491,56 @@ describe('calculatePlayerAvgRankInCat', () => {
     expect(typeof saved.players[0].avgRankInCat).toBe('number');
   });
 
+  test('uses the latest 10 rounds across season history', () => {
+    const player = {
+      id: 'p1', name: 'Alice', active: true, category: 'huitailang', ranking: 1,
+      avgRankInCat: '-', roundPlayed: 0,
+    };
+
+    const makeRound = (round, aliceRank) => {
+      const otherNames = ['Bob', 'Carol', 'Dave', 'Eve', 'Frank', 'Grace', 'Hank', 'Ivy', 'Jack'];
+      const rankings = [];
+      let otherIndex = 0;
+      for (let position = 1; position <= 10; position++) {
+        if (position === aliceRank) {
+          rankings.push({ name: 'Alice', category: 'huitailang', change: 'none' });
+        } else {
+          rankings.push({ name: otherNames[otherIndex++], category: 'huitailang', change: 'none' });
+        }
+      }
+      return { round, rankings };
+    };
+
+    const seasonHistory = {
+      '2025/26': [
+        makeRound(1, 10),
+        makeRound(2, 10),
+        makeRound(3, 10),
+      ],
+      '2026/27': [
+        makeRound(1, 1),
+        makeRound(2, 2),
+        makeRound(3, 3),
+        makeRound(4, 4),
+        makeRound(5, 5),
+        makeRound(6, 6),
+        makeRound(7, 7),
+        makeRound(8, 8),
+        makeRound(9, 9),
+        makeRound(10, 10),
+      ],
+    };
+
+    safeReadJson.mockReturnValue(makeDefaultData({ players: [player], currentSeason: '2026/27', roundHistory: seasonHistory }));
+    safeWriteJson.mockImplementation(() => {});
+
+    calculatePlayerAvgRankInCat('Alice');
+
+    const saved = safeWriteJson.mock.calls[0][1];
+    expect(saved.players[0].roundPlayed).toBe(13);
+    expect(saved.players[0].avgRankInCat).toBe(5.5);
+  });
+
   test('calculateAllPlayerAvgRankInCat writes only once for all players', () => {
     const players = [
       { id: 'p1', name: 'Alice', active: true, category: 'huitailang', ranking: 1 },
@@ -474,6 +550,171 @@ describe('calculatePlayerAvgRankInCat', () => {
     safeWriteJson.mockImplementation(() => {});
     calculateAllPlayerAvgRankInCat();
     expect(safeWriteJson).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── startNewSeason ──────────────────────────────────────────────────────────
+describe('startNewSeason', () => {
+  test('advances from the stored season and preserves the old snapshot', () => {
+    const store = makeDefaultData({
+      currentSeason: '2025/26',
+      seasons: {
+        '2025/26': { status: 'active', startDate: '2025-09-01', endDate: '2026-05-31', currentRound: 11 },
+      },
+      currentRound: 11,
+      players: [
+        {
+          id: 'p1', name: 'Alice', active: true, category: 'huitailang', ranking: 1,
+          numberOfMatchesTwentyOne: 30, winsTwentyOne: 22, totalNetScoreTwentyOne: 99,
+          numberOfMatchesFifteen: 0, winsFifteen: 0, totalNetScoreFifteen: 0,
+          roundPlayed: 10, avgRankInCat: 1.6,
+        },
+      ],
+      roundHistory: { '2025/26': [{ round: 1, rankings: [] }] },
+      matchHistory: { '2025/26': [{ id: 'm1', round: 1, team1: ['p1'], team2: ['p2'], score1: 21, score2: 10, completed: true }] },
+    });
+
+    safeReadJson.mockReturnValue(store);
+    safeWriteJson.mockImplementation((_, data) => {
+      Object.assign(store, JSON.parse(JSON.stringify(data)));
+      safeReadJson.mockReturnValue(store);
+    });
+
+    const result = startNewSeason();
+    const saved = safeWriteJson.mock.calls[safeWriteJson.mock.calls.length - 1][1];
+
+    expect(result.success).toBe(true);
+    expect(saved.currentSeason).toBe('2026/27');
+    expect(saved.seasons['2025/26'].status).toBe('archived');
+    expect(saved.seasons['2025/26'].finalRound).toBe(1); // max round from history
+    expect(saved.seasons['2026/27'].status).toBe('active');
+    expect(saved.currentRound).toBe(1);
+    expect(saved.players[0].numberOfMatchesTwentyOne).toBe(0);
+    expect(saved.players[0].avgRankInCat).toBe(1.6);
+    expect(saved.players[0].seasonHistory['2025/26']).toBeDefined();
+  });
+
+  test('uses the current calendar season when stored data is stale', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-07T12:00:00Z'));
+    try {
+      const store = makeDefaultData({
+        currentSeason: '2024/25',
+        seasons: {
+          '2024/25': { status: 'active', startDate: '2024-09-01', endDate: '2025-05-31', currentRound: 11 },
+        },
+        currentRound: 11,
+        players: [
+          {
+            id: 'p1', name: 'Alice', active: true, category: 'huitailang', ranking: 1,
+            numberOfMatchesTwentyOne: 30, winsTwentyOne: 22, totalNetScoreTwentyOne: 99,
+            numberOfMatchesFifteen: 0, winsFifteen: 0, totalNetScoreFifteen: 0,
+            roundPlayed: 10, avgRankInCat: 1.6,
+          },
+        ],
+        roundHistory: { '2024/25': [{ round: 1, rankings: [] }] },
+        matchHistory: { '2024/25': [{ id: 'm1', round: 1, team1: ['p1'], team2: ['p2'], score1: 21, score2: 10, completed: true }] },
+      });
+
+      safeReadJson.mockReturnValue(store);
+      safeWriteJson.mockImplementation((_, data) => {
+        Object.assign(store, JSON.parse(JSON.stringify(data)));
+        safeReadJson.mockReturnValue(store);
+      });
+
+      const result = startNewSeason();
+      const saved = safeWriteJson.mock.calls[safeWriteJson.mock.calls.length - 1][1];
+
+      expect(result.success).toBe(true);
+      expect(saved.currentSeason).toBe('2026/27');
+      expect(saved.seasons['2024/25'].status).toBe('archived');
+      expect(saved.seasons['2026/27'].status).toBe('active');
+      expect(saved.roundHistory['2026/27']).toEqual([]);
+      expect(saved.matchHistory['2026/27']).toEqual([]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('migrates legacy array history when season metadata already exists (mixed state)', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-07T12:00:00Z'));
+    try {
+      // Simulates the state where currentSeason was added manually but roundHistory is still an array
+      const store = {
+        players: [], groups: [], matches: [], currentRound: 11,
+        currentSeason: '2025/26',
+        seasons: { '2025/26': { status: 'active', startDate: '2025-09-01', endDate: '2026-05-31', currentRound: 11 } },
+        roundHistory: [{ round: 1, rankings: [] }, { round: 2, rankings: [] }],
+        matchHistory: [{ id: 'm1', round: 1, team1: [], team2: [], score1: 21, score2: 10, completed: true }],
+      };
+      safeReadJson.mockReturnValue(store);
+      safeWriteJson.mockImplementation((_, data) => { Object.assign(store, JSON.parse(JSON.stringify(data))); safeReadJson.mockReturnValue(store); });
+
+      const result = startNewSeason();
+      const saved = safeWriteJson.mock.calls[safeWriteJson.mock.calls.length - 1][1];
+
+      expect(result.success).toBe(true);
+      // Old season history must be preserved under its season key
+      expect(Array.isArray(saved.roundHistory['2025/26'])).toBe(true);
+      expect(saved.roundHistory['2025/26']).toHaveLength(2);
+      expect(Array.isArray(saved.matchHistory['2025/26'])).toBe(true);
+      expect(saved.matchHistory['2025/26']).toHaveLength(1);
+      // New season key is empty
+      expect(saved.roundHistory['2026/27']).toEqual([]);
+      expect(saved.matchHistory['2026/27']).toEqual([]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('normalizes legacy seasonless data to the previous season label', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-07T12:00:00Z'));
+
+    try {
+      const normalized = normalizeSeasonData({
+        players: [],
+        groups: [],
+        matches: [],
+        currentRound: 11,
+        roundHistory: [{ round: 1, rankings: [] }],
+        matchHistory: [{ id: 'm1', round: 1 }],
+      });
+
+      expect(normalized.currentSeason).toBe('2025/26');
+      expect(normalized.seasons['2025/26']).toBeDefined();
+      expect(normalized.roundHistory['2025/26']).toHaveLength(1);
+      expect(normalized.matchHistory['2025/26']).toHaveLength(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('sets finalRound from max round in history, not from currentRound (prevents finalRound=0 bug)', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-07T12:00:00Z'));
+    try {
+      // currentRound is already 1 (could happen if data was in a transitional state)
+      const store = makeDefaultData({
+        currentSeason: '2025/26',
+        seasons: { '2025/26': { status: 'active', startDate: '2025-09-01', endDate: '2026-05-31', currentRound: 11 } },
+        currentRound: 1,
+        players: [],
+        roundHistory: { '2025/26': [{ round: 8, rankings: [] }, { round: 9, rankings: [] }, { round: 10, rankings: [] }] },
+        matchHistory: { '2025/26': [] },
+      });
+      safeReadJson.mockReturnValue(store);
+      safeWriteJson.mockImplementation((_, data) => { Object.assign(store, JSON.parse(JSON.stringify(data))); safeReadJson.mockReturnValue(store); });
+
+      startNewSeason();
+      const saved = safeWriteJson.mock.calls[safeWriteJson.mock.calls.length - 1][1];
+
+      // finalRound must be 10 (max round from history), NOT 0 (currentRound - 1)
+      expect(saved.seasons['2025/26'].finalRound).toBe(10);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
@@ -627,7 +868,9 @@ describe('finishRound', () => {
   test('moves current matches to matchHistory', () => {
     finishRound();
     const saved = safeWriteJson.mock.calls[safeWriteJson.mock.calls.length - 1][1];
-    expect(saved.matchHistory.length).toBe(6);
+    // matchHistory is now organized by season (object), not a simple array
+    const season = saved.currentSeason;
+    expect(saved.matchHistory[season].length).toBe(6);
     expect(saved.matches.length).toBe(0);
   });
 
@@ -640,8 +883,10 @@ describe('finishRound', () => {
   test('adds round summary to roundHistory', () => {
     finishRound();
     const saved = safeWriteJson.mock.calls[safeWriteJson.mock.calls.length - 1][1];
-    expect(saved.roundHistory.length).toBe(1);
-    expect(saved.roundHistory[0].round).toBe(1);
+    // roundHistory is now organized by season (object), not a simple array
+    const season = saved.currentSeason;
+    expect(saved.roundHistory[season].length).toBe(1);
+    expect(saved.roundHistory[season][0].round).toBe(1);
   });
 
   test('resets returnCurrentRound to false for all players', () => {
