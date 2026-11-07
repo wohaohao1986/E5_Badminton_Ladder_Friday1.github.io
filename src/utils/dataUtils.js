@@ -242,7 +242,7 @@ function generateGroups() {
   const messages = {};
   
   Object.keys(CATEGORIES).forEach(cat => {
-    const activePlayers = getActivePlayers(data, cat);
+    const activePlayers = getActivePlayers(data, cat).filter(p => !p.absentCurrentRound);
     const total = activePlayers.length;
     messages[cat] = CATEGORIES[cat] + '分组情况：\n';
     
@@ -518,6 +518,7 @@ function finishRound() {
   const currentRoundMatches = data.matches.filter(m => m.round === data.currentRound);
   data.players.forEach(player => {
     player.returnCurrentRound = false;
+    player.absentCurrentRound = false;
     const playerMatches = getPlayerMatches(currentRoundMatches, player.id);
     if (playerMatches.length > 0) {
       updatePlayerMatchStats(player, playerMatches, 21);

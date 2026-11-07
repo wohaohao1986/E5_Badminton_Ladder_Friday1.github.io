@@ -547,14 +547,23 @@ function renderAdmin() {
       const statusBtn = p.active 
         ? `<button onclick="togglePlayerActive('${p.id}')" class="btn-warning" style="padding:5px 10px;font-size:12px;">停用</button>`
         : `<button onclick="togglePlayerActive('${p.id}')" class="btn-info" style="padding:5px 10px;font-size:12px;">启用</button>`;
-      const backgroundColor = p.isDropin ? '#E1BEE7' : '#C8E6C9';
+      const absentCheckbox = !p.active
+        ? `<label onclick="event.stopPropagation();togglePlayerAbsent('${p.id}')" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none;" title="仅缺席比赛或家属替换">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:2px solid ${p.absentCurrentRound ? '#fff' : '#795548'};border-radius:3px;background:${p.absentCurrentRound ? '#795548' : '#fff'};color:#fff;font-size:13px;flex-shrink:0;">${p.absentCurrentRound ? '✓' : ''}</span>
+            <span style="font-size:12px;color:${p.absentCurrentRound ? '#fff' : '#555'};">仅缺席比赛或家属替换</span>
+          </label>`
+        : '';
+      const backgroundColor = p.absentCurrentRound ? '#795548' : (p.isDropin ? '#E1BEE7' : '#C8E6C9');
       const isExpanded = expandedPlayers.has(p.id);
       const toggleIcon1 = isExpanded ? '▼' : '▶';
       
+      const textColor = p.absentCurrentRound ? 'color:#fff!important;' : '';
+
       html += `<div class="ranking-item ${statusClass}" style="background-color:${backgroundColor}!important;flex-direction:column;align-items:flex-start;" onclick="togglePlayerButtons('${p.id}', event)">
         <div style="display:flex;align-items:center;gap:10px;width:100%;">
-          <span style="font-weight:bold;min-width:40px;">#${p.ranking}</span>
-          <span style="flex:1;cursor:pointer;display:flex;align-items:center;gap:8px;"><span style="font-size:14px;width:16px;display:inline-block;text-align:center;">${toggleIcon1}</span>${p.name}</span>
+          <span style="font-weight:bold;min-width:40px;${textColor}">#${p.ranking}</span>
+          <span style="flex:1;cursor:pointer;display:flex;align-items:center;gap:8px;${textColor}"><span style="font-size:14px;width:16px;display:inline-block;text-align:center;">${toggleIcon1}</span>${p.name}</span>
+          ${absentCheckbox}
         </div>
         <fieldset style="display:${isExpanded ? 'block' : 'none'};border:none;padding:0;margin:10px 0 0 0;padding-left:60px;" class="player-buttons-${p.id}" onclick="event.stopPropagation();">
           <button onclick="changePlayerCategory('${p.id}')" class="btn-info" style="padding:5px 10px;font-size:12px;margin-right:5px;">改类别</button>
@@ -870,6 +879,16 @@ async function togglePlayerActive(id) {
   renderAdmin();
   renderMatch();
   renderScore();
+}
+
+// OnClick Function for '仅缺席比赛/取消缺席' button
+async function togglePlayerAbsent(id) {
+  const player = data.players.find(p => p.id === id);
+  const newAbsentStatus = !player.absentCurrentRound;
+
+  const response = await updateDataToServer('/api/player/', { id, absentCurrentRound: newAbsentStatus });
+  await syncDataFromServer();
+  renderAdmin();
 }
 
 

@@ -186,8 +186,16 @@ app.use('/api/player', playerRoutes);
 app.use('/api/match', matchRoutes);
 app.use('/api/opens', opensRoutes);
 
-// Serve static files (optional) - serves index.html / app.js if present
-app.use(express.static(path.join(__dirname)));
+// Serve static files — no-cache so phones always get the latest app.js/index.html
+app.use(express.static(path.join(__dirname), {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
 
 const PORT = process.env.PORT || 80;
 

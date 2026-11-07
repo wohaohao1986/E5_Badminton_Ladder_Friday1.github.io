@@ -43,7 +43,8 @@ function getFromServer(path) {
   const url = `${SERVER_BASE}${path}`;
   return fetch(url, {
     method: 'GET',
-    headers: { 'Content-Type': 'application/json' }
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+    cache: 'no-store'
   }).then(res => {
     if (!res.ok) throw new Error(`Server responded ${res.status}`);
     return res.json();

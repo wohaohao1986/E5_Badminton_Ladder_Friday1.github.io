@@ -110,6 +110,16 @@ router.put('/', (req, res) => {
     msg += checkAndPromptGroupingMessage(playerCategory);
   }
 
+  // Absent current round status change
+  if ('absentCurrentRound' in payload) {
+    const playerName = playersStore.players[playerIndex].name;
+    playersStore.players[playerIndex].absentCurrentRound = Boolean(payload.absentCurrentRound);
+    const statusLabel = payload.absentCurrentRound ? '仅缺席比赛或家属替换' : '取消比赛缺席';
+    logToFile(`Player ${playerName} absent status: ${statusLabel}`);
+    saveStore(playersStore);
+    msg += `${playerName} ${statusLabel}`;
+  }
+
   logToFile('Player updated successfully');
   res.status(200).json({ message: msg || 'OK' });
 });
