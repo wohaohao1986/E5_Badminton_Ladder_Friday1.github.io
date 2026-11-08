@@ -95,6 +95,7 @@ router.put('/', (req, res) => {
     if (payload.active === true) {
       logToFile(`Player ${playerName} activated`);
       logToFile(`Player activated in category ${playerCategory}`);
+      playersStore.players[playerIndex].isAbsent = false;
       msg = `选手${playerName}平均排名为${playersStore.players[playerIndex].avgRankInCat}\n`;
     } else {
       logToFile(`Player ${playerName} deactivated`);
@@ -111,10 +112,10 @@ router.put('/', (req, res) => {
   }
 
   // Absent current round status change
-  if ('absentCurrentRound' in payload) {
+  if ('isAbsent' in payload) {
     const playerName = playersStore.players[playerIndex].name;
-    playersStore.players[playerIndex].absentCurrentRound = Boolean(payload.absentCurrentRound);
-    const statusLabel = payload.absentCurrentRound ? '仅缺席比赛或家属替换' : '取消比赛缺席';
+    playersStore.players[playerIndex].isAbsent = Boolean(payload.isAbsent);
+    const statusLabel = payload.isAbsent ? '仅缺席比赛或家属替换' : '取消比赛缺席';
     logToFile(`Player ${playerName} absent status: ${statusLabel}`);
     saveStore(playersStore);
     msg += `${playerName} ${statusLabel}`;
